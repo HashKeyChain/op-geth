@@ -18,6 +18,7 @@ package vm
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
 	"sync/atomic"
 
@@ -133,6 +134,9 @@ type EVM struct {
 	// jumpDests is the aggregated result of JUMPDEST analysis made through
 	// the life cycle of EVM.
 	jumpDests map[common.Hash]bitvec
+
+	// CHANGE(hashkey): The flag to enable whitelist checking.
+	enableWhiteList bool
 }
 
 // NewEVM constructs an EVM instance with the supplied block context, state
@@ -202,6 +206,10 @@ func isSystemCall(caller common.Address) bool {
 // the necessary steps to create accounts and reverses the state in case of an
 // execution error or failed value transfer.
 func (evm *EVM) Call(caller common.Address, addr common.Address, input []byte, gas uint64, value *uint256.Int) (ret []byte, leftOverGas uint64, err error) {
+	// CHANGE(hashkey): Check whitelist if enabled
+	if err = evm.checkWhiteListAddress(addr); err != nil {
+		return nil, gas, err
+	}
 	caller = evm.maybeOverrideCaller(caller)
 	// Capture the tracer start/end events in debug mode
 	if evm.Config.Tracer != nil {
@@ -283,6 +291,10 @@ func (evm *EVM) Call(caller common.Address, addr common.Address, input []byte, g
 // CallCode differs from Call in the sense that it executes the given address'
 // code with the caller as context.
 func (evm *EVM) CallCode(caller common.Address, addr common.Address, input []byte, gas uint64, value *uint256.Int) (ret []byte, leftOverGas uint64, err error) {
+	// CHANGE(hashkey): Check whitelist if enabled
+	if err = evm.checkWhiteListAddress(addr); err != nil {
+		return nil, gas, err
+	}
 	caller = evm.maybeOverrideCaller(caller)
 	// Invoke tracer hooks that signal entering/exiting a call frame
 	if evm.Config.Tracer != nil {
@@ -333,6 +345,10 @@ func (evm *EVM) CallCode(caller common.Address, addr common.Address, input []byt
 // DelegateCall differs from CallCode in the sense that it executes the given address'
 // code with the caller as context and the caller is set to the caller of the caller.
 func (evm *EVM) DelegateCall(originCaller common.Address, caller common.Address, addr common.Address, input []byte, gas uint64, value *uint256.Int) (ret []byte, leftOverGas uint64, err error) {
+	// CHANGE(hashkey): Check whitelist if enabled
+	if err = evm.checkWhiteListAddress(addr); err != nil {
+		return nil, gas, err
+	}
 	caller = evm.maybeOverrideCaller(caller)
 	// Invoke tracer hooks that signal entering/exiting a call frame
 	if evm.Config.Tracer != nil {
@@ -377,6 +393,10 @@ func (evm *EVM) DelegateCall(originCaller common.Address, caller common.Address,
 // Opcodes that attempt to perform such modifications will result in exceptions
 // instead of performing the modifications.
 func (evm *EVM) StaticCall(caller common.Address, addr common.Address, input []byte, gas uint64) (ret []byte, leftOverGas uint64, err error) {
+	// CHANGE(hashkey): Check whitelist if enabled
+	if err = evm.checkWhiteListAddress(addr); err != nil {
+		return nil, gas, err
+	}
 	caller = evm.maybeOverrideCaller(caller)
 	// Invoke tracer hooks that signal entering/exiting a call frame
 	if evm.Config.Tracer != nil {
@@ -638,6 +658,33 @@ func (evm *EVM) captureEnd(depth int, startGas uint64, leftOverGas uint64, ret [
 	if tracer.OnExit != nil {
 		tracer.OnExit(depth, ret, startGas-leftOverGas, VMErrorFromErr(err), reverted)
 	}
+}
+
+// CHANGE(hashkey): Check whether the address is in the whitelist if enabled.
+func (evm *EVM) checkWhiteListAddress(addr common.Address) error {
+	isWhiteAddr := evm.isWhiteAddress(addr)
+	if evm.enableWhiteList {
+		if !isWhiteAddr {
+			return fmt.Errorf("%s should be in the white list", addr)
+		}
+	} else if isWhiteAddr {
+		evm.enableWhiteList = true
+	}
+	return nil
+}
+
+// CHANGE(hashkey): isWhiteAddress checks whether the address is in the whitelist.
+func (evm *EVM) isWhiteAddress(addr common.Address) bool {
+	// Correct storage slot calculation for mapping(address => bool) at slot WhiteListSlotNumber
+	var buf [64]byte
+	// Left-pad address to 32 bytes (address is 20 bytes, pad first 12 bytes with 0)
+	copy(buf[12:32], addr[:])
+	// Slot as 32-byte big-endian
+	slot := params.WhiteListSlotNumber.Bytes()
+	copy(buf[64-len(slot):], slot)
+	hash := crypto.Keccak256Hash(buf[:])
+	val := evm.StateDB.GetState(params.SandboxPolicyAddress, hash)
+	return val != (common.Hash{})
 }
 
 // GetVMContext provides context about the block being executed as well as state
