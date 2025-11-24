@@ -8,10 +8,10 @@ import (
 
 // CHANGE(hashkey): hashkey relate params.
 var (
-	// The sandbox router contracts.
+	// The sandbox router contract.
 	SandboxRouterAddress = common.HexToAddress("0x4200000000000000000000000000000000000425")
 
-	// The sandbox policy contracts.
+	// The sandbox policy contract.
 	SandboxPolicyAddress = common.HexToAddress("0x4200000000000000000000000000000000000426")
 
 	// The slot number of blackList in the policy contract.
