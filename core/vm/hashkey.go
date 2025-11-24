@@ -10,13 +10,17 @@ import (
 
 // CHANGE(hashkey): Check whether the address is in the whitelist if enabled.
 func (evm *EVM) checkWhiteListAddress(addr common.Address) error {
-	isWhiteAddr := evm.isWhiteAddress(addr)
-	// If the whitelist is enabled, the address must be in the whitelist or return an error.
-	if evm.enableWhiteList {
-		if !isWhiteAddr {
+	_, isPrecompile := evm.precompile(addr)
+	// If the whitelist is enabled, the address must be not a precompiled address and in the whitelist.
+	if evm.enableWhiteList && !isPrecompile {
+		// If the address is not in the whitelist and not a precompiled address, return an error.
+		if !evm.isWhiteAddress(addr) {
 			return fmt.Errorf("%s should be in the white list", addr)
 		}
-	} else if isWhiteAddr { // If the whitelist is not enabled, and the address is in the whitelist, enable it.
+		return nil
+	}
+	// If the whitelist is not enabled, and the address is in the whitelist, enable it.
+	if !evm.enableWhiteList && evm.isWhiteAddress(addr) {
 		evm.enableWhiteList = true
 	}
 	return nil
