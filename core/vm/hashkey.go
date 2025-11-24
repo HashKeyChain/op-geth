@@ -8,7 +8,7 @@ import (
 
 // CHANGE(hashkey): check whether the address is in the blacklist or not.
 func (evm *EVM) isBlackListAddress(addr common.Address) bool {
-	// Correct storage slot calculation for mapping(address => bool) at slot WhiteListSlotNumber
+	// Correct storage slot calculation for mapping(address => bool) at slot BlackListSlotNumber
 	var buf [64]byte
 	// Left-pad address to 32 bytes (address is 20 bytes, pad first 12 bytes with 0)
 	copy(buf[12:32], addr[:])
