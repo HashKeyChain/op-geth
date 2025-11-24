@@ -6,7 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
-// CHANGE(hashkey): hashkey contracts
+// CHANGE(hashkey): hashkey relate params.
 var (
 	// The sandbox router contracts.
 	SandboxRouterAddress = common.HexToAddress("0x4200000000000000000000000000000000000425")
