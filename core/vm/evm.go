@@ -204,10 +204,10 @@ func isSystemCall(caller common.Address) bool {
 // execution error or failed value transfer.
 func (evm *EVM) Call(caller common.Address, addr common.Address, input []byte, gas uint64, value *uint256.Int) (ret []byte, leftOverGas uint64, err error) {
 	// CHANGE(hashkey): reject calls from blacklisted addresses.
+	caller = evm.maybeOverrideCaller(caller)
 	if evm.isBlackListAddress(caller) {
 		return nil, gas, fmt.Errorf("%s is in the blacklist, call rejected", caller.Hex())
 	}
-	caller = evm.maybeOverrideCaller(caller)
 	// Capture the tracer start/end events in debug mode
 	if evm.Config.Tracer != nil {
 		evm.captureBegin(evm.depth, CALL, caller, addr, input, gas, value.ToBig())
