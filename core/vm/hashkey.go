@@ -16,6 +16,6 @@ func (evm *EVM) isBlackListAddress(addr common.Address) bool {
 	slot := params.BlackListSlotNumber.Bytes()
 	copy(buf[64-len(slot):], slot)
 	hash := crypto.Keccak256Hash(buf[:])
-	val := evm.StateDB.GetState(params.SandboxPolicyAddress, hash)
+	val := evm.StateDB.GetState(params.BlackAddress, hash)
 	return val != (common.Hash{})
 }
