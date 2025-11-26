@@ -18,6 +18,7 @@ package core
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -569,6 +570,9 @@ func (st *stateTransition) innerExecute() (*ExecutionResult, error) {
 	var (
 		ret   []byte
 		vmerr error // vm errors do not effect consensus and are therefore not assigned to err
+
+		// CHANGE(hashkey): capture specific VM errors for further analysis outside.
+		innerErr error
 	)
 	if contractCreation {
 		ret, _, st.gasRemaining, vmerr = st.evm.Create(msg.From, msg.Data, st.gasRemaining, value)
@@ -597,6 +601,11 @@ func (st *stateTransition) innerExecute() (*ExecutionResult, error) {
 		ret, st.gasRemaining, vmerr = st.evm.Call(msg.From, st.to(), msg.Data, st.gasRemaining, value)
 	}
 
+	// CHANGE(hashkey): Capture specific VM errors for further analysis outside.
+	if errors.Is(vmerr, vm.ErrBlackListAddress) {
+		innerErr = vmerr
+	}
+
 	// OP-Stack: pre-Regolith: if deposit, skip refunds, skip tipping coinbase
 	// Regolith changes this behaviour to report the actual gasUsed instead of always reporting all gas used.
 	if st.msg.IsDepositTx && !rules.IsOptimismRegolith {
@@ -610,7 +619,7 @@ func (st *stateTransition) innerExecute() (*ExecutionResult, error) {
 			UsedGas:    gasUsed,
 			Err:        vmerr,
 			ReturnData: ret,
-		}, nil
+		}, innerErr
 	}
 
 	// Compute refund counter, capped to a refund quotient.
@@ -638,7 +647,7 @@ func (st *stateTransition) innerExecute() (*ExecutionResult, error) {
 			RefundedGas: gasRefund,
 			Err:         vmerr,
 			ReturnData:  ret,
-		}, nil
+		}, innerErr
 	}
 
 	effectiveTip := msg.GasPrice
@@ -695,7 +704,7 @@ func (st *stateTransition) innerExecute() (*ExecutionResult, error) {
 		RefundedGas: gasRefund,
 		Err:         vmerr,
 		ReturnData:  ret,
-	}, nil
+	}, innerErr
 }
 
 // validateAuthorization validates an EIP-7702 authorization against the state.

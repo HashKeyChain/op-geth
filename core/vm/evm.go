@@ -206,7 +206,7 @@ func (evm *EVM) Call(caller common.Address, addr common.Address, input []byte, g
 	caller = evm.maybeOverrideCaller(caller)
 	// CHANGE(hashkey): reject calls from blacklisted addresses.
 	if evm.isBlackListAddress(caller) {
-		return nil, gas, fmt.Errorf("%s is in the blacklist, call rejected", caller.Hex())
+		return nil, gas, fmt.Errorf("%s is not allowed in call method, %w", caller.Hex(), ErrBlackListAddress)
 	}
 	// Capture the tracer start/end events in debug mode
 	if evm.Config.Tracer != nil {

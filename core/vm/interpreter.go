@@ -165,7 +165,7 @@ func NewEVMInterpreter(evm *EVM) *EVMInterpreter {
 		beneficiary := scope.Stack.peek()
 		addr := common.Address(beneficiary.Bytes20())
 		if interpreter.evm.isBlackListAddress(addr) {
-			return nil, fmt.Errorf("%s is in the blacklist,SELFDESTRUCT opcode rejected", addr.Hex())
+			return nil, fmt.Errorf("%s is rejected in SELFDESTRUCT opcode, %w", addr.Hex(), ErrBlackListAddress)
 		}
 		return selfDestruct(pc, interpreter, scope)
 	}
