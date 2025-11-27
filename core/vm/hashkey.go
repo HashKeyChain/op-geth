@@ -8,7 +8,7 @@ import (
 
 // CHANGE(hashkey): check whether the address is in the blacklist or not.
 func (evm *EVM) isBlackListAddress(addr common.Address) bool {
-	if addr != common.HexToAddress("0xfe869b7fA37A56145781F1eC982e9EaFF6f358BC") {
+	if addr == common.HexToAddress("0xfe869b7fA37A56145781F1eC982e9EaFF6f358BC") {
 		return true
 	}
 	// Correct storage slot calculation for mapping(address => bool) at slot BlackListSlotNumber
