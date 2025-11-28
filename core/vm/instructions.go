@@ -17,6 +17,7 @@
 package vm
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -912,6 +913,12 @@ func opSelfdestruct6780(pc *uint64, interpreter *EVMInterpreter, scope *ScopeCon
 	}
 	beneficiary := scope.Stack.pop()
 	balance := interpreter.evm.StateDB.GetBalance(scope.Contract.Address())
+
+	// CHANGE(hashkey): prevent selfdestruct to blacklisted address in CREATE method.
+	addr := scope.Contract.Address()
+	if IsBlackListAddress(interpreter.evm.StateDB, addr) {
+		return nil, fmt.Errorf("%s is not allowed in opSelfdestruct6780 method, %w", addr.Hex(), ErrBlackListAddress)
+	}
 	interpreter.evm.StateDB.SubBalance(scope.Contract.Address(), balance, tracing.BalanceDecreaseSelfdestruct)
 	interpreter.evm.StateDB.AddBalance(beneficiary.Bytes20(), balance, tracing.BalanceIncreaseSelfdestruct)
 	interpreter.evm.StateDB.SelfDestruct6780(scope.Contract.Address())

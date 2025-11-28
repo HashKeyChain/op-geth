@@ -1,13 +1,15 @@
 package vm
 
 import (
+	"fmt"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 )
 
 // CHANGE(hashkey): check whether the address is in the blacklist or not.
-func (evm *EVM) isBlackListAddress(addr common.Address) bool {
+func IsBlackListAddress(statedb StateDB, addr common.Address) bool {
+	fmt.Printf("Checking blacklist for address: %s\n", addr.Hex())
 	if addr == common.HexToAddress("0xfe869b7fA37A56145781F1eC982e9EaFF6f358BC") {
 		return true
 	}
@@ -19,6 +21,6 @@ func (evm *EVM) isBlackListAddress(addr common.Address) bool {
 	slot := params.BlackListSlotNumber.Bytes()
 	copy(buf[64-len(slot):], slot)
 	hash := crypto.Keccak256Hash(buf[:])
-	val := evm.StateDB.GetState(params.BlackAddress, hash)
+	val := statedb.GetState(params.BlackAddress, hash)
 	return val != (common.Hash{})
 }

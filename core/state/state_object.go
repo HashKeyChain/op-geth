@@ -463,6 +463,7 @@ func (s *stateObject) AddBalance(amount *uint256.Int) uint256.Int {
 		}
 		return *(s.Balance())
 	}
+	fmt.Printf("===========================, address: %s, balance: %s\n", s.address.Hex(), amount.String())
 	return s.SetBalance(new(uint256.Int).Add(s.Balance(), amount))
 }
 
