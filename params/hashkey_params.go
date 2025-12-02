@@ -9,7 +9,7 @@ import (
 // CHANGE(hashkey): hashkey contracts
 var (
 	// The sandbox policy contracts.
-	SandboxPolicyAddress = common.HexToAddress("0x4200000000000000000000000000000000000426")
+	SandboxPolicyAddress = common.HexToAddress("0x4200000000000000000000000000000000000425")
 
 	// The slot number of trustContractList in the policy contract.
 	TrustContractSlot = big.NewInt(0)
