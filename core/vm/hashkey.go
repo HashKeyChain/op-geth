@@ -7,7 +7,7 @@ import (
 )
 
 // CHANGE(hashkey): check whether the address is in the blacklist or not.
-func (evm *EVM) isBlackListAddress(addr common.Address) bool {
+func IsBlackListAddress(statedb StateDB, addr common.Address) bool {
 	// Correct storage slot calculation for mapping(address => bool) at slot BlackListSlotNumber
 	var buf [64]byte
 	// Left-pad address to 32 bytes (address is 20 bytes, pad first 12 bytes with 0)
@@ -16,6 +16,6 @@ func (evm *EVM) isBlackListAddress(addr common.Address) bool {
 	slot := params.BlackListSlotNumber.Bytes()
 	copy(buf[64-len(slot):], slot)
 	hash := crypto.Keccak256Hash(buf[:])
-	val := evm.StateDB.GetState(params.BlackAddress, hash)
+	val := statedb.GetState(params.BlackAddress, hash)
 	return val != (common.Hash{})
 }

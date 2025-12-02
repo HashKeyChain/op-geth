@@ -205,7 +205,7 @@ func isSystemCall(caller common.Address) bool {
 func (evm *EVM) Call(caller common.Address, addr common.Address, input []byte, gas uint64, value *uint256.Int) (ret []byte, leftOverGas uint64, err error) {
 	caller = evm.maybeOverrideCaller(caller)
 	// CHANGE(hashkey): reject calls from blacklisted addresses.
-	if evm.isBlackListAddress(caller) {
+	if IsBlackListAddress(evm.StateDB, caller) {
 		return nil, gas, fmt.Errorf("%s is not allowed in call method, %w", caller.Hex(), ErrBlackListAddress)
 	}
 	// Capture the tracer start/end events in debug mode
@@ -436,6 +436,10 @@ func (evm *EVM) StaticCall(caller common.Address, addr common.Address, input []b
 
 // create creates a new contract using code as deployment code.
 func (evm *EVM) create(caller common.Address, code []byte, gas uint64, value *uint256.Int, address common.Address, typ OpCode) (ret []byte, createAddress common.Address, leftOverGas uint64, err error) {
+	// CHANGE(hashkey): reject calls from blacklisted addresses.
+	if IsBlackListAddress(evm.StateDB, caller) {
+		return nil, common.Address{}, 0, fmt.Errorf("%s is not allowed in create method, %w", caller.Hex(), ErrBlackListAddress)
+	}
 	if evm.Config.Tracer != nil {
 		evm.captureBegin(evm.depth, typ, caller, address, code, gas, value.ToBig())
 		defer func(startGas uint64) {

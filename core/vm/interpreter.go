@@ -158,18 +158,6 @@ func NewEVMInterpreter(evm *EVM) *EVMInterpreter {
 			extraEips = append(extraEips, eip)
 		}
 	}
-
-	// CHANGE(hashkey): wrap SELFDESTRUCT to add blacklist check.
-	selfDestruct := table[SELFDESTRUCT].execute
-	table[SELFDESTRUCT].execute = func(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
-		beneficiary := scope.Stack.peek()
-		addr := common.Address(beneficiary.Bytes20())
-		if interpreter.evm.isBlackListAddress(addr) {
-			return nil, fmt.Errorf("%s is rejected in SELFDESTRUCT opcode, %w", addr.Hex(), ErrBlackListAddress)
-		}
-		return selfDestruct(pc, interpreter, scope)
-	}
-
 	evm.Config.ExtraEips = extraEips
 	return &EVMInterpreter{evm: evm, table: table}
 }

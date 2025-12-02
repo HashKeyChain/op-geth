@@ -151,11 +151,6 @@ func (miner *Miner) generateWork(params *generateParams, witness bool) *newPaylo
 		from, _ := types.Sender(work.signer, tx)
 		work.state.SetTxContext(tx.Hash(), work.tcount)
 		err = miner.commitTransaction(work, tx)
-		// CHANGE(hashkey): skip blacklisted forced-includes.
-		if errors.Is(err, vm.ErrBlackListAddress) {
-			log.Warn("drop blacklisted tx from forced-includes", "tx", tx.Hash())
-			continue
-		}
 		if err != nil {
 			return &newPayloadResult{err: fmt.Errorf("failed to force-include tx: %s type: %d sender: %s nonce: %d, err: %w", tx.Hash(), tx.Type(), from, tx.Nonce(), err)}
 		}
@@ -585,11 +580,6 @@ func (miner *Miner) commitTransactions(env *environment, plainTxs, blobTxs *tran
 
 		err := miner.commitTransaction(env, tx)
 		switch {
-		// CHANGE(hashkey): skip blacklisted transactions.
-		case errors.Is(err, vm.ErrBlackListAddress):
-			log.Warn("drop blacklisted tx from forced-includes", "tx", tx.Hash())
-			txs.Shift()
-
 		case errors.Is(err, core.ErrNonceTooLow):
 			// New head notification data race between the transaction pool and miner, shift
 			log.Trace("Skipping transaction with low nonce", "hash", ltx.Hash, "sender", from, "nonce", tx.Nonce())
