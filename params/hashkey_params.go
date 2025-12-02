@@ -14,6 +14,6 @@ var (
 	// The sandbox policy contracts.
 	SandboxPolicyAddress = common.HexToAddress("0x4200000000000000000000000000000000000426")
 
-	// The slot number of whiteList in the policy contract.
-	WhiteListSlotNumber = big.NewInt(4)
+	// The slot number of trustContractList in the policy contract.
+	TrustContractSlot = big.NewInt(3)
 )

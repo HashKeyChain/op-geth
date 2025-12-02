@@ -30,12 +30,12 @@ func (evm *EVM) sandboxPenetrateCheck(addr common.Address) error {
 
 // CHANGE(hashkey): isSandboxTrustedContract checks whether the address is in the whitelist.
 func (evm *EVM) isSandboxTrustedContract(addr common.Address) bool {
-	// Correct storage slot calculation for mapping(address => bool) at slot WhiteListSlotNumber
+	// Correct storage slot calculation for mapping(address => bool) at slot TrustContractSlot.
 	var buf [64]byte
 	// Left-pad address to 32 bytes (address is 20 bytes, pad first 12 bytes with 0)
 	copy(buf[12:32], addr[:])
 	// Slot as 32-byte big-endian
-	slot := params.WhiteListSlotNumber.Bytes()
+	slot := params.TrustContractSlot.Bytes()
 	copy(buf[64-len(slot):], slot)
 	hash := crypto.Keccak256Hash(buf[:])
 	val := evm.StateDB.GetState(params.SandboxPolicyAddress, hash)
