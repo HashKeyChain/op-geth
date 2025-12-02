@@ -13,7 +13,4 @@ var (
 
 	// The slot number of trustContractList in the policy contract.
 	TrustContractSlot = big.NewInt(0)
-
-	// The slot number of kycList in the policy contract.
-	KycSlot = big.NewInt(1)
 )
