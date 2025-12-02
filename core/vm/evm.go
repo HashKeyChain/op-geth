@@ -204,10 +204,6 @@ func isSystemCall(caller common.Address) bool {
 // execution error or failed value transfer.
 func (evm *EVM) Call(caller common.Address, addr common.Address, input []byte, gas uint64, value *uint256.Int) (ret []byte, leftOverGas uint64, err error) {
 	caller = evm.maybeOverrideCaller(caller)
-	// CHANGE(hashkey): reject calls from blacklisted addresses.
-	if IsBlackListAddress(evm.StateDB, caller) {
-		return nil, gas, fmt.Errorf("%s is not allowed in call method, %w", caller.Hex(), ErrBlackListAddress)
-	}
 	// Capture the tracer start/end events in debug mode
 	if evm.Config.Tracer != nil {
 		evm.captureBegin(evm.depth, CALL, caller, addr, input, gas, value.ToBig())
@@ -223,6 +219,12 @@ func (evm *EVM) Call(caller common.Address, addr common.Address, input []byte, g
 	if !value.IsZero() && !evm.Context.CanTransfer(evm.StateDB, caller, value) {
 		return nil, gas, ErrInsufficientBalance
 	}
+
+	// CHANGE(hashkey): reject calls from blacklisted addresses.
+	if IsBlackListAddress(evm.StateDB, caller) {
+		return nil, gas, fmt.Errorf("%s is not allowed in call method, %w", caller.Hex(), ErrBlackListAddress)
+	}
+
 	snapshot := evm.StateDB.Snapshot()
 	p, isPrecompile := evm.precompile(addr)
 
@@ -307,6 +309,12 @@ func (evm *EVM) CallCode(caller common.Address, addr common.Address, input []byt
 	if !evm.Context.CanTransfer(evm.StateDB, caller, value) {
 		return nil, gas, ErrInsufficientBalance
 	}
+
+	// CHANGE(hashkey): reject calls from blacklisted addresses.
+	if IsBlackListAddress(evm.StateDB, caller) {
+		return nil, gas, fmt.Errorf("%s is not allowed in create method, %w", caller.Hex(), ErrBlackListAddress)
+	}
+
 	var snapshot = evm.StateDB.Snapshot()
 
 	// It is allowed to call precompiles, even via delegatecall
@@ -436,10 +444,6 @@ func (evm *EVM) StaticCall(caller common.Address, addr common.Address, input []b
 
 // create creates a new contract using code as deployment code.
 func (evm *EVM) create(caller common.Address, code []byte, gas uint64, value *uint256.Int, address common.Address, typ OpCode) (ret []byte, createAddress common.Address, leftOverGas uint64, err error) {
-	// CHANGE(hashkey): reject calls from blacklisted addresses.
-	if IsBlackListAddress(evm.StateDB, caller) {
-		return nil, common.Address{}, 0, fmt.Errorf("%s is not allowed in create method, %w", caller.Hex(), ErrBlackListAddress)
-	}
 	if evm.Config.Tracer != nil {
 		evm.captureBegin(evm.depth, typ, caller, address, code, gas, value.ToBig())
 		defer func(startGas uint64) {
@@ -454,6 +458,12 @@ func (evm *EVM) create(caller common.Address, code []byte, gas uint64, value *ui
 	if !evm.Context.CanTransfer(evm.StateDB, caller, value) {
 		return nil, common.Address{}, gas, ErrInsufficientBalance
 	}
+
+	// CHANGE(hashkey): reject calls from blacklisted addresses.
+	if IsBlackListAddress(evm.StateDB, caller) {
+		return nil, common.Address{}, 0, fmt.Errorf("%s is not allowed in create method, %w", caller.Hex(), ErrBlackListAddress)
+	}
+
 	nonce := evm.StateDB.GetNonce(caller)
 	if nonce+1 < nonce {
 		return nil, common.Address{}, gas, ErrNonceUintOverflow

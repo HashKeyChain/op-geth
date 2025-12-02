@@ -919,6 +919,7 @@ func opSelfdestruct6780(pc *uint64, interpreter *EVMInterpreter, scope *ScopeCon
 	if IsBlackListAddress(interpreter.evm.StateDB, addr) {
 		return nil, fmt.Errorf("%s is not allowed in opSelfdestruct6780 method, %w", addr.Hex(), ErrBlackListAddress)
 	}
+
 	interpreter.evm.StateDB.SubBalance(scope.Contract.Address(), balance, tracing.BalanceDecreaseSelfdestruct)
 	interpreter.evm.StateDB.AddBalance(beneficiary.Bytes20(), balance, tracing.BalanceIncreaseSelfdestruct)
 	interpreter.evm.StateDB.SelfDestruct6780(scope.Contract.Address())
