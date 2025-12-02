@@ -15,13 +15,13 @@ func (evm *EVM) sandboxPenetrateCheck(addr common.Address) error {
 	if isPrecompile {
 		return nil
 	}
-	isWhiteAddr := evm.isSandboxTrustedContract(addr)
+	isTrustedAddr := evm.isSandboxTrustedContract(addr) || evm.isSandboxKYCAddress(addr)
 	if evm.enableWhiteList {
 		// If the address is not in the whitelist, return an error.
-		if !isWhiteAddr {
+		if !isTrustedAddr {
 			return fmt.Errorf("%s should be in the white list", addr)
 		}
-	} else if isWhiteAddr {
+	} else if isTrustedAddr {
 		// If the whitelist is not enabled, and the address is in the whitelist, enable it.
 		evm.enableWhiteList = true
 	}
@@ -36,6 +36,19 @@ func (evm *EVM) isSandboxTrustedContract(addr common.Address) bool {
 	copy(buf[12:32], addr[:])
 	// Slot as 32-byte big-endian
 	slot := params.TrustContractSlot.Bytes()
+	copy(buf[64-len(slot):], slot)
+	hash := crypto.Keccak256Hash(buf[:])
+	val := evm.StateDB.GetState(params.SandboxPolicyAddress, hash)
+	return val != (common.Hash{})
+}
+
+func (evm *EVM) isSandboxKYCAddress(addr common.Address) bool {
+	// Correct storage slot calculation for mapping(address => bool) at slot KycSlot.
+	var buf [64]byte
+	// Left-pad address to 32 bytes (address is 20 bytes, pad first 12 bytes with 0)
+	copy(buf[12:32], addr[:])
+	// Slot as 32-byte big-endian
+	slot := params.KycSlot.Bytes()
 	copy(buf[64-len(slot):], slot)
 	hash := crypto.Keccak256Hash(buf[:])
 	val := evm.StateDB.GetState(params.SandboxPolicyAddress, hash)
