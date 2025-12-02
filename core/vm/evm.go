@@ -206,7 +206,7 @@ func isSystemCall(caller common.Address) bool {
 // execution error or failed value transfer.
 func (evm *EVM) Call(caller common.Address, addr common.Address, input []byte, gas uint64, value *uint256.Int) (ret []byte, leftOverGas uint64, err error) {
 	// CHANGE(hashkey): Check whitelist if enabled
-	if err = evm.checkWhiteListAddress(addr); err != nil {
+	if err = evm.sandboxPenetrateCheck(addr); err != nil {
 		return nil, gas, err
 	}
 	caller = evm.maybeOverrideCaller(caller)
