@@ -8,9 +8,6 @@ import (
 
 // CHANGE(hashkey): hashkey contracts
 var (
-	// The sandbox router contracts.
-	SandboxRouterAddress = common.HexToAddress("0x4200000000000000000000000000000000000425")
-
 	// The sandbox policy contracts.
 	SandboxPolicyAddress = common.HexToAddress("0x4200000000000000000000000000000000000426")
 
