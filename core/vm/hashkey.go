@@ -12,18 +12,12 @@ import (
 func (evm *EVM) sandboxPenetrateCheck(addr common.Address) error {
 	_, isPrecompile := evm.precompile(addr)
 	// If the address is a precompiled or the sandbox policy address, skip the check.
-	if isPrecompile {
+	if isPrecompile || !evm.enableWhiteList {
 		return nil
 	}
-	isTrustedAddr := evm.isSandboxTrustedContract(addr)
-	if evm.enableWhiteList {
-		// If the address is not in the whitelist, return an error.
-		if !isTrustedAddr {
-			return fmt.Errorf("%s should be in the white list", addr)
-		}
-	} else if isTrustedAddr {
-		// If the whitelist is not enabled, and the address is in the whitelist, enable it.
-		evm.enableWhiteList = true
+	// If the address is not in the whitelist, return an error.
+	if !evm.isSandboxTrustedContract(addr) {
+		return fmt.Errorf("%s should be in the white list", addr)
 	}
 	return nil
 }
@@ -40,4 +34,11 @@ func (evm *EVM) isSandboxTrustedContract(addr common.Address) bool {
 	hash := crypto.Keccak256Hash(buf[:])
 	val := evm.StateDB.GetState(params.SandboxPolicyAddress, hash)
 	return val != (common.Hash{})
+}
+
+// CHANGE(hashkey): EnableWhiteList enables the whitelist check for sandbox penetration.
+func (evm *EVM) EnableWhiteList(addr common.Address) {
+	if addr != (common.Address{}) && evm.isSandboxTrustedContract(addr) {
+		evm.enableWhiteList = true
+	}
 }
