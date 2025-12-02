@@ -12,7 +12,7 @@ import (
 func (evm *EVM) sandboxPenetrateCheck(addr common.Address) error {
 	_, isPrecompile := evm.precompile(addr)
 	// If the address is a precompiled or the sandbox policy address, skip the check.
-	if isPrecompile || !evm.enableWhiteList {
+	if isPrecompile || !evm.enableSandboxPenetrateCheck {
 		return nil
 	}
 	// If the address is not in the whitelist, return an error.
@@ -36,9 +36,9 @@ func (evm *EVM) isSandboxTrustedContract(addr common.Address) bool {
 	return val != (common.Hash{})
 }
 
-// CHANGE(hashkey): EnableWhiteList enables the whitelist check for sandbox penetration.
-func (evm *EVM) EnableWhiteList(addr common.Address) {
+// CHANGE(hashkey): EnableSandboxPenetrateCheck enables the whitelist check for sandbox penetration.
+func (evm *EVM) EnableSandboxPenetrateCheck(addr common.Address) {
 	if addr != (common.Address{}) && evm.isSandboxTrustedContract(addr) {
-		evm.enableWhiteList = true
+		evm.enableSandboxPenetrateCheck = true
 	}
 }

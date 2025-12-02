@@ -594,7 +594,7 @@ func (st *stateTransition) innerExecute() (*ExecutionResult, error) {
 		}
 
 		// CHANGE: Try to enable the whitelist for calls from L2 geth.
-		st.evm.EnableWhiteList(st.to())
+		st.evm.EnableSandboxPenetrateCheck(st.to())
 
 		// Execute the transaction's call.
 		ret, st.gasRemaining, vmerr = st.evm.Call(msg.From, st.to(), msg.Data, st.gasRemaining, value)

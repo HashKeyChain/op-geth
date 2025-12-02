@@ -135,7 +135,7 @@ type EVM struct {
 	jumpDests map[common.Hash]bitvec
 
 	// CHANGE(hashkey): The flag to enable whitelist checking.
-	enableWhiteList bool
+	enableSandboxPenetrateCheck bool
 }
 
 // NewEVM constructs an EVM instance with the supplied block context, state
