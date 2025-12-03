@@ -18,6 +18,7 @@ package vm
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
 	"sync/atomic"
 
@@ -218,6 +219,12 @@ func (evm *EVM) Call(caller common.Address, addr common.Address, input []byte, g
 	if !value.IsZero() && !evm.Context.CanTransfer(evm.StateDB, caller, value) {
 		return nil, gas, ErrInsufficientBalance
 	}
+
+	// CHANGE(hashkey): reject calls from blacklisted addresses.
+	if IsBlackListAddress(evm.StateDB, caller) {
+		return nil, gas, fmt.Errorf("%s is not allowed in call method, %w", caller.Hex(), ErrBlackListAddress)
+	}
+
 	snapshot := evm.StateDB.Snapshot()
 	p, isPrecompile := evm.precompile(addr)
 
@@ -302,6 +309,12 @@ func (evm *EVM) CallCode(caller common.Address, addr common.Address, input []byt
 	if !evm.Context.CanTransfer(evm.StateDB, caller, value) {
 		return nil, gas, ErrInsufficientBalance
 	}
+
+	// CHANGE(hashkey): reject calls from blacklisted addresses.
+	if IsBlackListAddress(evm.StateDB, caller) {
+		return nil, gas, fmt.Errorf("%s is not allowed in create method, %w", caller.Hex(), ErrBlackListAddress)
+	}
+
 	var snapshot = evm.StateDB.Snapshot()
 
 	// It is allowed to call precompiles, even via delegatecall
@@ -445,6 +458,12 @@ func (evm *EVM) create(caller common.Address, code []byte, gas uint64, value *ui
 	if !evm.Context.CanTransfer(evm.StateDB, caller, value) {
 		return nil, common.Address{}, gas, ErrInsufficientBalance
 	}
+
+	// CHANGE(hashkey): reject calls from blacklisted addresses.
+	if IsBlackListAddress(evm.StateDB, caller) {
+		return nil, common.Address{}, 0, fmt.Errorf("%s is not allowed in create method, %w", caller.Hex(), ErrBlackListAddress)
+	}
+
 	nonce := evm.StateDB.GetNonce(caller)
 	if nonce+1 < nonce {
 		return nil, common.Address{}, gas, ErrNonceUintOverflow
