@@ -134,6 +134,9 @@ type EVM struct {
 	// jumpDests is the aggregated result of JUMPDEST analysis made through
 	// the life cycle of EVM.
 	jumpDests map[common.Hash]bitvec
+
+	// CHANGE(hashkey): The flag to enable whitelist checking.
+	enableSandboxPenetrateCheck bool
 }
 
 // NewEVM constructs an EVM instance with the supplied block context, state
@@ -203,6 +206,10 @@ func isSystemCall(caller common.Address) bool {
 // the necessary steps to create accounts and reverses the state in case of an
 // execution error or failed value transfer.
 func (evm *EVM) Call(caller common.Address, addr common.Address, input []byte, gas uint64, value *uint256.Int) (ret []byte, leftOverGas uint64, err error) {
+	// CHANGE(hashkey): Check whitelist if enabled
+	if err = evm.sandboxPenetrateCheck(addr); err != nil {
+		return nil, gas, err
+	}
 	caller = evm.maybeOverrideCaller(caller)
 	// Capture the tracer start/end events in debug mode
 	if evm.Config.Tracer != nil {
