@@ -556,6 +556,11 @@ func (st *stateTransition) innerExecute() (*ExecutionResult, error) {
 		return nil, fmt.Errorf("%w: address %v", ErrInsufficientFundsForTransfer, msg.From.Hex())
 	}
 
+	// CHANGE(hashkey): reject calls from blacklisted addresses.
+	if vm.IsBlackListAddress(st.state, msg.From) {
+		return nil, fmt.Errorf("%s is not allowed in call method, %w", msg.From, vm.ErrBlackListAddress)
+	}
+
 	// Check whether the init code size has been exceeded.
 	if rules.IsShanghai && contractCreation && len(msg.Data) > params.MaxInitCodeSize {
 		return nil, fmt.Errorf("%w: code size %v limit %v", ErrMaxInitCodeSizeExceeded, len(msg.Data), params.MaxInitCodeSize)
@@ -592,6 +597,9 @@ func (st *stateTransition) innerExecute() (*ExecutionResult, error) {
 		if addr, ok := types.ParseDelegation(st.state.GetCode(*msg.To)); ok {
 			st.state.AddAddressToAccessList(addr)
 		}
+
+		// CHANGE: Try to enable the whitelist for calls from L2 geth.
+		st.evm.EnableSandboxPenetrateCheck(st.to())
 
 		// Execute the transaction's call.
 		ret, st.gasRemaining, vmerr = st.evm.Call(msg.From, st.to(), msg.Data, st.gasRemaining, value)

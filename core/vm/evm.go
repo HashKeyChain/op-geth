@@ -18,6 +18,7 @@ package vm
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
 	"sync/atomic"
 
@@ -133,6 +134,9 @@ type EVM struct {
 	// jumpDests is the aggregated result of JUMPDEST analysis made through
 	// the life cycle of EVM.
 	jumpDests map[common.Hash]bitvec
+
+	// CHANGE(hashkey): The flag to enable whitelist checking.
+	enableSandboxPenetrateCheck bool
 }
 
 // NewEVM constructs an EVM instance with the supplied block context, state
@@ -202,6 +206,10 @@ func isSystemCall(caller common.Address) bool {
 // the necessary steps to create accounts and reverses the state in case of an
 // execution error or failed value transfer.
 func (evm *EVM) Call(caller common.Address, addr common.Address, input []byte, gas uint64, value *uint256.Int) (ret []byte, leftOverGas uint64, err error) {
+	// CHANGE(hashkey): Check whitelist if enabled
+	if err = evm.sandboxPenetrateCheck(addr); err != nil {
+		return nil, gas, err
+	}
 	caller = evm.maybeOverrideCaller(caller)
 	// Capture the tracer start/end events in debug mode
 	if evm.Config.Tracer != nil {
@@ -218,6 +226,12 @@ func (evm *EVM) Call(caller common.Address, addr common.Address, input []byte, g
 	if !value.IsZero() && !evm.Context.CanTransfer(evm.StateDB, caller, value) {
 		return nil, gas, ErrInsufficientBalance
 	}
+
+	// CHANGE(hashkey): reject calls from blacklisted addresses.
+	if IsBlackListAddress(evm.StateDB, caller) {
+		return nil, gas, fmt.Errorf("%s is not allowed in call method, %w", caller.Hex(), ErrBlackListAddress)
+	}
+
 	snapshot := evm.StateDB.Snapshot()
 	p, isPrecompile := evm.precompile(addr)
 
@@ -302,6 +316,12 @@ func (evm *EVM) CallCode(caller common.Address, addr common.Address, input []byt
 	if !evm.Context.CanTransfer(evm.StateDB, caller, value) {
 		return nil, gas, ErrInsufficientBalance
 	}
+
+	// CHANGE(hashkey): reject calls from blacklisted addresses.
+	if IsBlackListAddress(evm.StateDB, caller) {
+		return nil, gas, fmt.Errorf("%s is not allowed in create method, %w", caller.Hex(), ErrBlackListAddress)
+	}
+
 	var snapshot = evm.StateDB.Snapshot()
 
 	// It is allowed to call precompiles, even via delegatecall
@@ -445,6 +465,12 @@ func (evm *EVM) create(caller common.Address, code []byte, gas uint64, value *ui
 	if !evm.Context.CanTransfer(evm.StateDB, caller, value) {
 		return nil, common.Address{}, gas, ErrInsufficientBalance
 	}
+
+	// CHANGE(hashkey): reject calls from blacklisted addresses.
+	if IsBlackListAddress(evm.StateDB, caller) {
+		return nil, common.Address{}, 0, fmt.Errorf("%s is not allowed in create method, %w", caller.Hex(), ErrBlackListAddress)
+	}
+
 	nonce := evm.StateDB.GetNonce(caller)
 	if nonce+1 < nonce {
 		return nil, common.Address{}, gas, ErrNonceUintOverflow
