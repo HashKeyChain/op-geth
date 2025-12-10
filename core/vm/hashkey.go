@@ -53,6 +53,6 @@ func IsBlackListAddress(statedb StateDB, addr common.Address) bool {
 	slot := params.BlackListSlotNumber.Bytes()
 	copy(buf[64-len(slot):], slot)
 	hash := crypto.Keccak256Hash(buf[:])
-	val := statedb.GetState(params.BlackListAddress, hash)
+	val := statedb.GetState(params.SandboxPolicyAddress, hash)
 	return val != (common.Hash{})
 }
