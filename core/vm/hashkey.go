@@ -5,19 +5,31 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 )
 
 // CHANGE(hashkey): Check whether the address is in the whitelist if enabled.
-func (evm *EVM) sandboxPenetrateCheck(addr common.Address) error {
-	_, isPrecompile := evm.precompile(addr)
+func (evm *EVM) SandboxPenetrateCheck(addr common.Address) error {
 	// If the address is a precompiled or the sandbox policy address, skip the check.
-	if isPrecompile || !evm.enableSandboxPenetrateCheck {
+	_, isPrecompile := evm.precompile(addr)
+	if isPrecompile {
 		return nil
 	}
-	// If the address is not in the whitelist, return an error.
-	if !evm.isSandboxTrustedContract(addr) {
-		return fmt.Errorf("%s should be in the white list", addr)
+
+	preContract := evm.preContract
+	evm.preContract = addr
+	if evm.isSandboxTrustedContract(addr) {
+		if !evm.isInSandbox {
+			log.Error("Detect sandbox penetrate in", "from", preContract.Hex(), "to", addr.Hex())
+			return fmt.Errorf("detect sandbox penetrate in, from: %s, to: %s", preContract.Hex(), addr.Hex())
+		} else {
+			return nil
+		}
+	}
+	if evm.isInSandbox {
+		log.Error("Detect sandbox penetrate out", "from", preContract.Hex(), "to", addr.Hex())
+		return fmt.Errorf("detect sandbox penetrate out, from %s, to %s", preContract.Hex(), addr.Hex())
 	}
 	return nil
 }
@@ -36,10 +48,11 @@ func (evm *EVM) isSandboxTrustedContract(addr common.Address) bool {
 	return val != (common.Hash{})
 }
 
-// CHANGE(hashkey): EnableSandboxPenetrateCheck enables the whitelist check for sandbox penetration.
-func (evm *EVM) EnableSandboxPenetrateCheck(addr common.Address) {
+// CHANGE(hashkey): InitSandboxPenetrateCheck init the sandbox penetration check for the tx.
+func (evm *EVM) InitSandboxPenetrateCheck(addr common.Address) {
+	evm.preContract = addr
 	if addr != (common.Address{}) && evm.isSandboxTrustedContract(addr) {
-		evm.enableSandboxPenetrateCheck = true
+		evm.isInSandbox = true
 	}
 }
 

@@ -141,7 +141,8 @@ type EVM struct {
 	returnData []byte // Last CALL's return data for subsequent reuse
 
 	// CHANGE(hashkey): The flag to enable whitelist checking.
-	enableSandboxPenetrateCheck bool
+	isInSandbox bool
+	preContract common.Address
 }
 
 // NewEVM constructs an EVM instance with the supplied block context, state
@@ -260,7 +261,7 @@ func isSystemCall(caller common.Address) bool {
 // execution error or failed value transfer.
 func (evm *EVM) Call(caller common.Address, addr common.Address, input []byte, gas uint64, value *uint256.Int) (ret []byte, leftOverGas uint64, err error) {
 	// CHANGE(hashkey): Check whitelist if enabled
-	if err = evm.sandboxPenetrateCheck(addr); err != nil {
+	if err = evm.SandboxPenetrateCheck(addr); err != nil {
 		return nil, gas, err
 	}
 	caller = evm.maybeOverrideCaller(caller)
