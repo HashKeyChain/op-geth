@@ -17,6 +17,10 @@ func (evm *EVM) SandboxPenetrateCheck(addr common.Address) error {
 		return nil
 	}
 
+	if len(evm.resolveCode(addr)) == 0 {
+		return nil
+	}
+
 	preContract := evm.preContract
 	evm.preContract = addr
 	if evm.isSandboxTrustedContract(addr) {
