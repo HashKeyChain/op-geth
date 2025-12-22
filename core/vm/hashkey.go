@@ -12,7 +12,7 @@ import (
 // CHANGE(hashkey): Sandbox type constants for penetration detection.
 const (
 	SandboxTypeTransparent uint8 = 0 // Transparent: doesn't affect detection
-	SandboxTypeTrustList   uint8 = 1 // TrustList: sandbox core
+	SandboxTypeTrusted     uint8 = 1 // TrustList: sandbox core
 	SandboxTypeOther       uint8 = 2 // Other: outside sandbox
 )
 
@@ -56,7 +56,7 @@ func (evm *EVM) getSandboxType(addr common.Address) uint8 {
 		return SandboxTypeTransparent
 	}
 	if evm.isSandboxTrustedContract(addr) {
-		return SandboxTypeTrustList
+		return SandboxTypeTrusted
 	}
 	return SandboxTypeOther
 }
