@@ -140,8 +140,9 @@ type EVM struct {
 	readOnly   bool   // Whether to throw on stateful modifications
 	returnData []byte // Last CALL's return data for subsequent reuse
 
-	// CHANGE(hashkey): The flag to enable whitelist checking.
-	isInSandbox bool
+	// CHANGE(hashkey): Sandbox penetration detection using bitwise OR.
+	// GreyList=0, TrustList=1, Other=2. If sandboxFlag==3, penetration detected.
+	sandboxFlag uint8
 	preContract common.Address
 }
 

@@ -18,4 +18,7 @@ var (
 
 	// The slot number of trustContractList in the policy contract.
 	TrustContractSlot = big.NewInt(0)
+
+	// The slot number of sandboxBoundaryExceptions in the policy contract.
+	SandboxBoundaryExceptionsSlot = big.NewInt(7)
 )
