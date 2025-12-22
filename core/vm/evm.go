@@ -282,7 +282,7 @@ func (evm *EVM) Call(caller common.Address, addr common.Address, input []byte, g
 	}
 
 	// CHANGE(hashkey): reject calls from blacklisted addresses.
-	if IsBlackListAddress(evm.StateDB, caller) {
+	if evm.IsBlackListAddress(caller) {
 		return nil, gas, fmt.Errorf("%s is not allowed in call method, %w", caller.Hex(), ErrBlackListAddress)
 	}
 
@@ -378,7 +378,7 @@ func (evm *EVM) CallCode(caller common.Address, addr common.Address, input []byt
 	}
 
 	// CHANGE(hashkey): reject calls from blacklisted addresses.
-	if IsBlackListAddress(evm.StateDB, caller) {
+	if evm.IsBlackListAddress(caller) {
 		return nil, gas, fmt.Errorf("%s is not allowed in create method, %w", caller.Hex(), ErrBlackListAddress)
 	}
 
@@ -527,7 +527,7 @@ func (evm *EVM) create(caller common.Address, code []byte, gas uint64, value *ui
 	}
 
 	// CHANGE(hashkey): reject calls from blacklisted addresses.
-	if IsBlackListAddress(evm.StateDB, caller) {
+	if evm.IsBlackListAddress(caller) {
 		return nil, common.Address{}, 0, fmt.Errorf("%s is not allowed in create method, %w", caller.Hex(), ErrBlackListAddress)
 	}
 

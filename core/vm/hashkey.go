@@ -61,7 +61,7 @@ func (evm *EVM) InitSandboxPenetrateCheck(addr common.Address) {
 }
 
 // CHANGE(hashkey): check whether the address is in the blacklist or not.
-func IsBlackListAddress(statedb StateDB, addr common.Address) bool {
+func (evm *EVM) IsBlackListAddress(addr common.Address) bool {
 	// Correct storage slot calculation for mapping(address => bool) at slot BlackListSlotNumber
 	var buf [64]byte
 	// Left-pad address to 32 bytes (address is 20 bytes, pad first 12 bytes with 0)
@@ -70,6 +70,6 @@ func IsBlackListAddress(statedb StateDB, addr common.Address) bool {
 	slot := params.BlackListSlotNumber.Bytes()
 	copy(buf[64-len(slot):], slot)
 	hash := crypto.Keccak256Hash(buf[:])
-	val := statedb.GetState(params.HashKeyBlacklist, hash)
+	val := evm.StateDB.GetState(params.HashKeyBlacklist, hash)
 	return val != (common.Hash{})
 }

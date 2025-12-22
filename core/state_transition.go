@@ -567,7 +567,7 @@ func (st *stateTransition) innerExecute() (*ExecutionResult, error) {
 	}
 
 	// CHANGE(hashkey): reject calls from blacklisted addresses.
-	if vm.IsBlackListAddress(st.state, msg.From) {
+	if st.evm.IsBlackListAddress(msg.From) {
 		return nil, fmt.Errorf("%s is not allowed in call method, %w", msg.From, vm.ErrBlackListAddress)
 	}
 

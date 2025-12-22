@@ -910,7 +910,7 @@ func opSelfdestruct6780(pc *uint64, evm *EVM, scope *ScopeContext) ([]byte, erro
 
 	// CHANGE(hashkey): prevent selfdestruct to blacklisted address in CREATE method.
 	addr := scope.Contract.Address()
-	if IsBlackListAddress(evm.StateDB, addr) {
+	if evm.IsBlackListAddress(addr) {
 		return nil, fmt.Errorf("%s is not allowed in opSelfdestruct6780 method, %w", addr.Hex(), ErrBlackListAddress)
 	}
 
