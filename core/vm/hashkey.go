@@ -52,11 +52,11 @@ func (evm *EVM) SandboxPenetrateCheck(addr common.Address) error {
 
 // CHANGE(hashkey): getSandboxType returns the sandbox type of an address.
 func (evm *EVM) getSandboxType(addr common.Address) uint8 {
-	if evm.isSandboxTrustedContract(addr) {
-		return SandboxTypeTrustList
-	}
 	if evm.isGreyListContract(addr) {
 		return SandboxTypeTransparent
+	}
+	if evm.isSandboxTrustedContract(addr) {
+		return SandboxTypeTrustList
 	}
 	return SandboxTypeOther
 }
