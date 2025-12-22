@@ -141,7 +141,7 @@ type EVM struct {
 	returnData []byte // Last CALL's return data for subsequent reuse
 
 	// CHANGE(hashkey): Sandbox penetration detection using bitwise OR.
-	// GreyList=0, TrustList=1, Other=2. If sandboxFlag==3, penetration detected.
+	// Transparent=0, TrustList=1, Other=2. If sandboxFlag==3, penetration detected.
 	sandboxFlag uint8
 	preContract common.Address
 }

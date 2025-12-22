@@ -35,12 +35,15 @@ func (evm *EVM) SandboxPenetrateCheck(addr common.Address) error {
 	// Determine the type of target address
 	addrType := evm.getSandboxType(addr)
 
-	// Apply OR operation (GreyList=0 is transparent)
+	// Save previous flag before OR operation
+	prevFlag := evm.sandboxFlag
+
+	// Apply OR operation (addrType=0 is transparent)
 	evm.sandboxFlag |= addrType
 
 	// If sandboxFlag == 3, both TrustList(1) and Other(2) appeared in the call chain
 	if evm.sandboxFlag == 3 {
-		log.Error("Detect sandbox penetrate", "from", preContract.Hex(), "to", addr.Hex(), "flag", evm.sandboxFlag)
+		log.Error("Detect sandbox penetrate", "from", preContract.Hex(), "to", addr.Hex(), "prevFlag", prevFlag)
 		return fmt.Errorf("detect sandbox penetrate, from: %s, to: %s", preContract.Hex(), addr.Hex())
 	}
 
@@ -72,7 +75,7 @@ func (evm *EVM) isSandboxTrustedContract(addr common.Address) bool {
 	return val != (common.Hash{})
 }
 
-// CHANGE(hashkey): isGreyListContract checks whether the address is in the GreyList.
+// CHANGE(hashkey): isGreyListContract checks whether the address is in the SandboxBoundaryExceptions.
 func (evm *EVM) isGreyListContract(addr common.Address) bool {
 	// Correct storage slot calculation for mapping(address => bool) at slot GreyContractSlot.
 	var buf [64]byte
