@@ -268,6 +268,9 @@ type ValidationOptionsWithState struct {
 
 	// RollupCostFn is an optional extension, to validate total rollup costs of a tx
 	RollupCostFn RollupCostFunc
+
+	// IsBlacklisted is an optional callback to check if the sender is blacklisted
+	IsBlacklisted func(statedb *state.StateDB, from common.Address) bool
 }
 
 // ValidateTransactionWithState is a helper method to check whether a transaction
@@ -326,6 +329,12 @@ func ValidateTransactionWithState(tx *types.Transaction, signer types.Signer, op
 			if used, left := opts.UsedAndLeftSlots(from); left <= 0 {
 				return fmt.Errorf("%w: pooled %d txs", ErrAccountLimitExceeded, used)
 			}
+		}
+	}
+	// Check if the sender is blacklisted
+	if opts.IsBlacklisted != nil {
+		if opts.IsBlacklisted(opts.State, from) {
+			return fmt.Errorf("%w: %s", ErrBlacklisted, from.Hex())
 		}
 	}
 	return nil
