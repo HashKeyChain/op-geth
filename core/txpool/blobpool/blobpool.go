@@ -561,7 +561,9 @@ func (p *BlobPool) recheck(addr common.Address, inclusions map[common.Hash]uint6
 		delete(p.index, addr)
 		delete(p.spent, addr)
 		if inclusions != nil { // only during reorgs will the heap be initialized
-			heap.Remove(p.evict, p.evict.index[addr])
+			if idx, ok := p.evict.index[addr]; ok {
+				heap.Remove(p.evict, idx)
+			}
 		}
 		log.Trace("Dropping blacklisted blob transactions", "from", addr, "drop", nonces, "ids", ids)
 		for i, id := range ids {
