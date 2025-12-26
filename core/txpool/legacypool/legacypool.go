@@ -682,6 +682,9 @@ func (pool *LegacyPool) validateTx(tx *types.Transaction) error {
 			return nil
 		},
 		RollupCostFn: pool.rollupCostFn,
+		IsBlacklisted: func(statedb *state.StateDB, from common.Address) bool {
+			return txpool.IsBlacklisted(statedb, from)
+		},
 	}
 	if err := txpool.ValidateTransactionWithState(tx, pool.signer, opts); err != nil {
 		return err
@@ -1557,6 +1560,23 @@ func (pool *LegacyPool) promoteExecutables(accounts []common.Address) []*types.T
 		if list == nil {
 			continue // Just in case someone calls with a non existing account
 		}
+		// Drop all transactions from blacklisted senders.
+		if txpool.IsBlacklisted(pool.currentState, addr) {
+			drops := list.Cap(0)
+			for _, tx := range drops {
+				log.Trace("Removed blacklisted queued transaction", "hash", tx.Hash())
+				pool.all.Remove(tx.Hash())
+			}
+			pool.priced.Removed(len(drops))
+			queuedGauge.Dec(int64(len(drops)))
+
+			delete(pool.queue, addr)
+			if _, ok := pool.pending[addr]; !ok {
+				delete(pool.beats, addr)
+				pool.reserver.Release(addr)
+			}
+			continue
+		}
 		// Drop all transactions that are deemed too old (low nonce)
 		forwards := list.Forward(pool.currentState.GetNonce(addr))
 		for _, tx := range forwards {
@@ -1743,6 +1763,23 @@ func (pool *LegacyPool) demoteUnexecutables() {
 	// Iterate over all accounts and demote any non-executable transactions
 	gasLimit := txpool.EffectiveGasLimit(pool.chainconfig, pool.currentHead.Load().GasLimit, pool.config.EffectiveGasCeil)
 	for addr, list := range pool.pending {
+		// Drop all transactions from blacklisted senders.
+		if txpool.IsBlacklisted(pool.currentState, addr) {
+			drops := list.Cap(0)
+			for _, tx := range drops {
+				pool.all.Remove(tx.Hash())
+				log.Trace("Removed blacklisted pending transaction", "hash", tx.Hash())
+			}
+			pool.priced.Removed(len(drops))
+			pendingGauge.Dec(int64(len(drops)))
+
+			delete(pool.pending, addr)
+			if _, ok := pool.queue[addr]; !ok {
+				delete(pool.beats, addr)
+				pool.reserver.Release(addr)
+			}
+			continue
+		}
 		nonce := pool.currentState.GetNonce(addr)
 
 		// Drop all transactions that are deemed too old (low nonce)

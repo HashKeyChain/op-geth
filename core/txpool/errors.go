@@ -75,4 +75,7 @@ var (
 	// ErrTxGasLimitExceeded is returned if a transaction's gas limit exceeds the
 	// configured maximum per-transaction limit.
 	ErrTxGasLimitExceeded = errors.New("exceeds maximum per-transaction gas limit")
+
+	// ErrBlacklisted is returned if the transaction sender is in the on-chain blacklist.
+	ErrBlacklisted = errors.New("sender is in the on-chain blacklist")
 )
