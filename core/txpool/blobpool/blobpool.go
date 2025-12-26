@@ -545,33 +545,6 @@ func (p *BlobPool) recheck(addr common.Address, inclusions map[common.Hash]uint6
 	if inclusions != nil && txs == nil { // during reorgs, we might find new accounts
 		return
 	}
-	// Drop all transactions from blacklisted senders.
-	if txs != nil && txpool.IsBlacklisted(p.state, addr) {
-		var (
-			ids    []uint64
-			nonces []uint64
-		)
-		for i := 0; i < len(txs); i++ {
-			ids = append(ids, txs[i].id)
-			nonces = append(nonces, txs[i].nonce)
-
-			p.stored -= uint64(txs[i].storageSize)
-			p.lookup.untrack(txs[i])
-		}
-		delete(p.index, addr)
-		delete(p.spent, addr)
-		if inclusions != nil { // only during reorgs will the heap be initialized
-			heap.Remove(p.evict, p.evict.index[addr])
-		}
-		log.Trace("Dropping blacklisted blob transactions", "from", addr, "drop", nonces, "ids", ids)
-		for i, id := range ids {
-			if err := p.store.Delete(id); err != nil {
-				log.Error("Failed to delete blacklisted blob transaction", "from", addr, "tx", txs[i].hash, "nonce", txs[i].nonce, "id", id, "err", err)
-			}
-		}
-		p.reserver.Release(addr)
-		return
-	}
 	sort.Slice(txs, func(i, j int) bool {
 		return txs[i].nonce < txs[j].nonce
 	})
@@ -1221,9 +1194,6 @@ func (p *BlobPool) validateTx(tx *types.Transaction) error {
 				return p.index[addr][int(nonce-next)].costCap.ToBig()
 			}
 			return nil
-		},
-		IsBlacklisted: func(statedb *state.StateDB, from common.Address) bool {
-			return txpool.IsBlacklisted(statedb, from)
 		},
 	}
 	if err := txpool.ValidateTransactionWithState(tx, p.signer, stateOpts); err != nil {
