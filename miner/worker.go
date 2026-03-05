@@ -749,7 +749,7 @@ func (miner *Miner) commitTransactions(env *environment, plainTxs, blobTxs *tran
 		default:
 			// Transaction is regarded as invalid, drop all consecutive transactions from
 			// the same sender because of `nonce-too-high` clause.
-			log.Debug("Transaction failed, account skipped", "hash", ltx.Hash, "err", err)
+			log.Info("[TPS-PROF] tx FAILED, account skipped", "hash", ltx.Hash, "from", from, "err", err)
 			txs.Pop()
 		}
 	}
@@ -759,18 +759,16 @@ func (miner *Miner) commitTransactions(env *environment, plainTxs, blobTxs *tran
 		avgExec = txTotalExec / time.Duration(txCount)
 	}
 	logSummary := func() {
-		if txCount > 0 || stopReason != "no-more-txs" {
-			log.Info("[TPS-PROF] commitTransactions summary",
-				"committed", txCount,
-				"gasConsumed", gasAtStart-env.gasPool.Gas(),
-				"stopReason", stopReason,
-				"totalExec", common.PrettyDuration(txTotalExec),
-				"avgExec", common.PrettyDuration(avgExec),
-				"slowestExec", common.PrettyDuration(txSlowest),
-				"slowestIdx", txSlowestIdx,
-				"elapsed", common.PrettyDuration(time.Since(tCommitStart)),
-			)
-		}
+		log.Info("[TPS-PROF] commitTransactions summary",
+			"committed", txCount,
+			"gasConsumed", gasAtStart-env.gasPool.Gas(),
+			"stopReason", stopReason,
+			"totalExec", common.PrettyDuration(txTotalExec),
+			"avgExec", common.PrettyDuration(avgExec),
+			"slowestExec", common.PrettyDuration(txSlowest),
+			"slowestIdx", txSlowestIdx,
+			"elapsed", common.PrettyDuration(time.Since(tCommitStart)),
+		)
 	}
 	// Handle interrupt return after logging
 	if interrupt != nil {
@@ -829,14 +827,15 @@ func (miner *Miner) fillTransactions(interrupt *atomic.Int32, env *environment) 
 	for _, txs := range pendingBlobTxs {
 		blobTxCount += len(txs)
 	}
-	if plainTxCount > 0 || blobTxCount > 0 {
-		log.Info("[TPS-PROF] fillTransactions: txpool.Pending",
-			"plainAccounts", len(pendingPlainTxs),
-			"plainTxs", plainTxCount,
-			"blobTxs", blobTxCount,
-			"pendingElapsed", common.PrettyDuration(tPendingDone.Sub(tPendingStart)),
-		)
-	}
+	log.Info("[TPS-PROF] fillTransactions: txpool.Pending",
+		"plainAccounts", len(pendingPlainTxs),
+		"plainTxs", plainTxCount,
+		"blobTxs", blobTxCount,
+		"filterMinTip", filter.MinTip,
+		"filterBaseFee", filter.BaseFee,
+		"filterMaxDATxSize", filter.MaxDATxSize,
+		"pendingElapsed", common.PrettyDuration(tPendingDone.Sub(tPendingStart)),
+	)
 
 	// Split the pending transactions into locals and remotes.
 	prioPlainTxs, normalPlainTxs := make(map[common.Address][]*txpool.LazyTransaction), pendingPlainTxs

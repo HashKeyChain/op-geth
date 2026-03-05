@@ -567,18 +567,34 @@ func (pool *LegacyPool) Pending(filter txpool.PendingFilter) map[common.Address]
 	pending := make(map[common.Address][]*txpool.LazyTransaction, len(pool.pending))
 	for addr, list := range pool.pending {
 		txs := list.Flatten()
+		origLen := len(txs)
 
 		// If the miner requests tip enforcement, cap the lists now
 		if filter.MinTip != nil || filter.GasLimitCap != 0 {
 			for i, tx := range txs {
 				if filter.MinTip != nil {
 					if tx.EffectiveGasTipIntCmp(filter.MinTip, filter.BaseFee) < 0 {
+						log.Info("[TPS-PROF] Pending: MinTip filter truncated",
+							"addr", addr,
+							"atIndex", i,
+							"origLen", origLen,
+							"txHash", tx.Hash(),
+							"txNonce", tx.Nonce(),
+							"txGasFeeCap", tx.GasFeeCap(),
+							"txGasTipCap", tx.GasTipCap(),
+							"filterMinTip", filter.MinTip,
+							"filterBaseFee", filter.BaseFee,
+						)
 						txs = txs[:i]
 						break
 					}
 				}
 				if filter.GasLimitCap != 0 {
 					if tx.Gas() > filter.GasLimitCap {
+						log.Info("[TPS-PROF] Pending: GasLimitCap filter truncated",
+							"addr", addr, "atIndex", i, "origLen", origLen,
+							"txGas", tx.Gas(), "cap", filter.GasLimitCap,
+						)
 						txs = txs[:i]
 						break
 					}
@@ -591,12 +607,19 @@ func (pool *LegacyPool) Pending(filter txpool.PendingFilter) map[common.Address]
 			for i, tx := range txs {
 				estimate := tx.RollupCostData().EstimatedDASize()
 				if estimate.Cmp(filter.MaxDATxSize) > 0 {
-					log.Debug("filtering tx that exceeds max da tx size",
-						"hash", tx.Hash(), "txda", estimate, "dalimit", filter.MaxDATxSize)
+					log.Info("[TPS-PROF] Pending: MaxDATxSize filter truncated",
+						"addr", addr, "atIndex", i, "origLen", origLen,
+						"txDA", estimate, "daLimit", filter.MaxDATxSize,
+					)
 					txs = txs[:i]
 					break
 				}
 			}
+		}
+		if origLen > 0 && len(txs) == 0 {
+			log.Info("[TPS-PROF] Pending: ALL txs filtered for account",
+				"addr", addr, "origLen", origLen,
+			)
 		}
 		if len(txs) > 0 {
 			lazies := make([]*txpool.LazyTransaction, len(txs))
