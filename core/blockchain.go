@@ -1600,6 +1600,8 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 	if !bc.HasHeader(block.ParentHash(), block.NumberU64()-1) {
 		return consensus.ErrUnknownAncestor
 	}
+	tWriteStart := time.Now()
+
 	// Irrelevant of the canonical status, write the block itself to the database.
 	//
 	// Note all the components of block(hash->number map, header, body, receipts)
@@ -1611,11 +1613,23 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 	if err := blockBatch.Write(); err != nil {
 		log.Crit("Failed to write block into disk", "err", err)
 	}
+	tAfterBlockWrite := time.Now()
+
 	// Commit all cached state changes into underlying memory database.
 	root, stateUpdate, err := statedb.CommitWithUpdate(block.NumberU64(), bc.chainConfig.IsEIP158(block.Number()), bc.chainConfig.IsCancun(block.Number(), block.Time()))
 	if err != nil {
 		return err
 	}
+	tAfterStateCommit := time.Now()
+
+	log.Info("[TPS-PROF] writeBlockWithState breakdown",
+		"block", block.NumberU64(),
+		"txs", len(block.Transactions()),
+		"blockWriteDB", common.PrettyDuration(tAfterBlockWrite.Sub(tWriteStart)),
+		"stateCommit", common.PrettyDuration(tAfterStateCommit.Sub(tAfterBlockWrite)),
+		"total", common.PrettyDuration(tAfterStateCommit.Sub(tWriteStart)),
+		"stateRoot", root,
+	)
 	// Emit the state update to the state sizestats if it's active
 	if bc.stateSizer != nil {
 		bc.stateSizer.Notify(stateUpdate)
@@ -1683,9 +1697,13 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 // writeBlockAndSetHead is the internal implementation of WriteBlockAndSetHead.
 // This function expects the chain mutex to be held.
 func (bc *BlockChain) writeBlockAndSetHead(block *types.Block, receipts []*types.Receipt, logs []*types.Log, state *state.StateDB, emitHeadEvent bool) (status WriteStatus, err error) {
+	tSetHeadStart := time.Now()
+
 	if err := bc.writeBlockWithState(block, receipts, state); err != nil {
 		return NonStatTy, err
 	}
+	tAfterWriteState := time.Now()
+
 	currentBlock := bc.CurrentBlock()
 
 	// Reorganise the chain if the parent is not the head block
@@ -1697,6 +1715,7 @@ func (bc *BlockChain) writeBlockAndSetHead(block *types.Block, receipts []*types
 
 	// Set new head.
 	bc.writeHeadBlock(block)
+	tAfterSetHead := time.Now()
 
 	bc.chainFeed.Send(ChainEvent{
 		Header:       block.Header(),
@@ -1715,6 +1734,14 @@ func (bc *BlockChain) writeBlockAndSetHead(block *types.Block, receipts []*types
 	if emitHeadEvent {
 		bc.chainHeadFeed.Send(ChainHeadEvent{Header: block.Header()})
 	}
+
+	log.Info("[TPS-PROF] writeBlockAndSetHead",
+		"block", block.NumberU64(),
+		"txs", len(block.Transactions()),
+		"writeState", common.PrettyDuration(tAfterWriteState.Sub(tSetHeadStart)),
+		"setHead", common.PrettyDuration(tAfterSetHead.Sub(tAfterWriteState)),
+		"total", common.PrettyDuration(time.Since(tSetHeadStart)),
+	)
 	return CanonStatTy, nil
 }
 

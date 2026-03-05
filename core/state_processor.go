@@ -19,6 +19,7 @@ package core
 import (
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/misc"
@@ -27,6 +28,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 )
 
@@ -162,11 +164,14 @@ func ApplyTransactionWithEVM(msg *Message, gp *GasPool, statedb *state.StateDB, 
 		nonce = statedb.GetNonce(msg.From)
 	}
 
+	tApplyStart := time.Now()
 	// Apply the transaction to the current state (included in the env).
 	result, err := ApplyMessage(evm, msg, gp)
 	if err != nil {
 		return nil, err
 	}
+	tAfterApply := time.Now()
+
 	// Update the state with pending changes.
 	var root []byte
 	if evm.ChainConfig().IsByzantium(blockNumber) {
@@ -174,6 +179,7 @@ func ApplyTransactionWithEVM(msg *Message, gp *GasPool, statedb *state.StateDB, 
 	} else {
 		root = statedb.IntermediateRoot(evm.ChainConfig().IsEIP158(blockNumber)).Bytes()
 	}
+	tAfterFinalise := time.Now()
 	*usedGas += result.UsedGas
 
 	// Merge the tx-local access event into the "block-local" one, in order to collect
@@ -181,7 +187,18 @@ func ApplyTransactionWithEVM(msg *Message, gp *GasPool, statedb *state.StateDB, 
 	if statedb.Database().TrieDB().IsVerkle() {
 		statedb.AccessEvents().Merge(evm.AccessEvents)
 	}
-	return MakeReceipt(evm, result, statedb, blockNumber, blockHash, blockTime, tx, *usedGas, root, evm.ChainConfig(), nonce), nil
+	r := MakeReceipt(evm, result, statedb, blockNumber, blockHash, blockTime, tx, *usedGas, root, evm.ChainConfig(), nonce)
+	tAfterReceipt := time.Now()
+
+	log.Info("[TPS-PROF] ApplyTxWithEVM breakdown",
+		"txHash", tx.Hash().Hex()[:10],
+		"gasUsed", result.UsedGas,
+		"applyMsg", common.PrettyDuration(tAfterApply.Sub(tApplyStart)),
+		"finalise", common.PrettyDuration(tAfterFinalise.Sub(tAfterApply)),
+		"receipt", common.PrettyDuration(tAfterReceipt.Sub(tAfterFinalise)),
+		"total", common.PrettyDuration(tAfterReceipt.Sub(tApplyStart)),
+	)
+	return r, nil
 }
 
 // MakeReceipt generates the receipt object for a transaction given its execution result.

@@ -142,10 +142,13 @@ type generateParams struct {
 
 // generateWork generates a sealing block based on the given parameters.
 func (miner *Miner) generateWork(genParam *generateParams, witness bool) *newPayloadResult {
+	tStart := time.Now()
+
 	work, err := miner.prepareWork(genParam, witness)
 	if err != nil {
 		return &newPayloadResult{err: err}
 	}
+	tAfterPrepare := time.Now()
 
 	// Check withdrawals fit max block size.
 	// Due to the cap on withdrawal count, this can actually never happen, but we still need to
@@ -182,6 +185,9 @@ func (miner *Miner) generateWork(genParam *generateParams, witness bool) *newPay
 			return &newPayloadResult{err: fmt.Errorf("failed to force-include tx: %s type: %d sender: %s nonce: %d, err: %w", tx.Hash(), tx.Type(), from, tx.Nonce(), err)}
 		}
 	}
+
+	tBeforeFill := time.Now()
+	fillErr := error(nil)
 	if !genParam.noTxs {
 		// use shared interrupt if present
 		interrupt := genParam.interrupt
@@ -192,14 +198,15 @@ func (miner *Miner) generateWork(genParam *generateParams, witness bool) *newPay
 			interrupt.Store(commitInterruptTimeout)
 		})
 
-		err := miner.fillTransactions(interrupt, work)
+		fillErr = miner.fillTransactions(interrupt, work)
 		timer.Stop() // don't need timeout interruption any more
-		if errors.Is(err, errBlockInterruptedByTimeout) {
+		if errors.Is(fillErr, errBlockInterruptedByTimeout) {
 			log.Warn("Block building is interrupted", "allowance", common.PrettyDuration(miner.config.Recommit))
-		} else if errors.Is(err, errBlockInterruptedByResolve) {
+		} else if errors.Is(fillErr, errBlockInterruptedByResolve) {
 			log.Info("Block building got interrupted by payload resolution")
 		}
 	}
+	tAfterFill := time.Now()
 
 	body := types.Body{Transactions: work.txs, Withdrawals: genParam.withdrawals}
 
@@ -245,6 +252,28 @@ func (miner *Miner) generateWork(genParam *generateParams, witness bool) *newPay
 	if err != nil {
 		return &newPayloadResult{err: err}
 	}
+	tAfterFinalize := time.Now()
+
+	gasUsed := work.header.GasUsed
+	gasLimit := work.header.GasLimit
+	gasUtil := float64(0)
+	if gasLimit > 0 {
+		gasUtil = float64(gasUsed) / float64(gasLimit) * 100
+	}
+	log.Info("[TPS-PROF] generateWork breakdown",
+		"block", work.header.Number,
+		"txs", len(work.txs),
+		"gasUsed", gasUsed,
+		"gasLimit", gasLimit,
+		"gasUtil%", fmt.Sprintf("%.1f", gasUtil),
+		"prepareWork", common.PrettyDuration(tAfterPrepare.Sub(tStart)),
+		"forceTxs", common.PrettyDuration(tBeforeFill.Sub(tAfterPrepare)),
+		"fillTxs", common.PrettyDuration(tAfterFill.Sub(tBeforeFill)),
+		"finalize", common.PrettyDuration(tAfterFinalize.Sub(tAfterFill)),
+		"total", common.PrettyDuration(tAfterFinalize.Sub(tStart)),
+		"timeout", errors.Is(fillErr, errBlockInterruptedByTimeout),
+	)
+
 	return &newPayloadResult{
 		block:    block,
 		fees:     totalFees(block, work.receipts),
@@ -509,15 +538,34 @@ func (miner *Miner) commitTransactions(env *environment, plainTxs, blobTxs *tran
 	isJovian := miner.chainConfig.IsJovian(env.header.Time)
 	minTransactionDAFootprint := types.MinTransactionSize.Uint64() * uint64(env.daFootprintGasScalar)
 
+	tCommitStart := time.Now()
+	var (
+		txCount      int
+		txTotalExec  time.Duration
+		txSlowest    time.Duration
+		txSlowestIdx int
+		gasAtStart   = env.gasPool.Gas()
+		stopReason   = "no-more-txs"
+	)
+
+	if interrupt != nil {
+		if signal := interrupt.Load(); signal != commitInterruptNone {
+			log.Warn("[TPS-PROF] commitTransactions: interrupt ALREADY SET on entry, 0 txs will be committed",
+				"signal", signal, "gasPool", env.gasPool.Gas())
+		}
+	}
+
 	for {
 		// Check interruption signal and abort building if it's fired.
 		if interrupt != nil {
 			if signal := interrupt.Load(); signal != commitInterruptNone {
-				return signalToErr(signal)
+				stopReason = fmt.Sprintf("interrupted-after-%d-txs", txCount)
+				break
 			}
 		}
 		// If we don't have enough gas for any further transactions then we're done.
 		if env.gasPool.Gas() < params.TxGas {
+			stopReason = "gas-exhausted"
 			log.Trace("Not enough gas for further transactions", "have", env.gasPool, "want", params.TxGas)
 			break
 		}
@@ -527,6 +575,7 @@ func (miner *Miner) commitTransactions(env *environment, plainTxs, blobTxs *tran
 			daFootprintLeft = gasLimit - *env.header.BlobGasUsed
 			// If we don't have enough DA space for any further transactions then we're done.
 			if daFootprintLeft < minTransactionDAFootprint {
+				stopReason = "da-exhausted"
 				log.Debug("Not enough DA space for further transactions", "have", daFootprintLeft, "want", minTransactionDAFootprint)
 				break
 			}
@@ -564,7 +613,8 @@ func (miner *Miner) commitTransactions(env *environment, plainTxs, blobTxs *tran
 		}
 		// If we don't have enough space for the next transaction, skip the account.
 		if env.gasPool.Gas() < ltx.Gas {
-			log.Trace("Not enough gas left for transaction", "hash", ltx.Hash, "left", env.gasPool.Gas(), "needed", ltx.Gas)
+			log.Info("[TPS-PROF] gas not enough for next tx, skipping",
+				"txHash", ltx.Hash, "gasLeft", env.gasPool.Gas(), "txGas", ltx.Gas)
 			txs.Pop()
 			continue
 		}
@@ -623,6 +673,7 @@ func (miner *Miner) commitTransactions(env *environment, plainTxs, blobTxs *tran
 		// if inclusion of the transaction would put the block size over the
 		// maximum we allow, don't add any more txs to the payload.
 		if !env.txFitsSize(tx) {
+			stopReason = "block-size-limit"
 			break
 		}
 		// Error may be ignored here. The error has already been checked
@@ -639,7 +690,11 @@ func (miner *Miner) commitTransactions(env *environment, plainTxs, blobTxs *tran
 		// Start executing the transaction
 		env.state.SetTxContext(tx.Hash(), env.tcount)
 
+		gasPoolBefore := env.gasPool.Gas()
+		tTxStart := time.Now()
 		err := miner.commitTransaction(env, tx)
+		txExecDur := time.Since(tTxStart)
+
 		switch {
 		case errors.Is(err, core.ErrNonceTooLow):
 			// New head notification data race between the transaction pool and miner, shift
@@ -664,6 +719,22 @@ func (miner *Miner) commitTransactions(env *environment, plainTxs, blobTxs *tran
 			txs.Pop()
 
 		case errors.Is(err, nil):
+			txCount++
+			txTotalExec += txExecDur
+			gasConsumed := gasPoolBefore - env.gasPool.Gas()
+			if txExecDur > txSlowest {
+				txSlowest = txExecDur
+				txSlowestIdx = txCount
+			}
+			log.Info("[TPS-PROF] tx committed",
+				"idx", txCount,
+				"hash", tx.Hash().Hex()[:10],
+				"from", from,
+				"gasUsed", gasConsumed,
+				"execTime", common.PrettyDuration(txExecDur),
+				"gasPoolLeft", env.gasPool.Gas(),
+			)
+
 			// Everything ok, collect the logs and shift in the next transaction from the same account
 			blockDABytes = daBytesAfter
 			if isJovian {
@@ -678,6 +749,37 @@ func (miner *Miner) commitTransactions(env *environment, plainTxs, blobTxs *tran
 			txs.Pop()
 		}
 	}
+
+	avgExec := time.Duration(0)
+	if txCount > 0 {
+		avgExec = txTotalExec / time.Duration(txCount)
+	}
+	// Handle interrupt return after logging
+	if interrupt != nil {
+		if signal := interrupt.Load(); signal != commitInterruptNone {
+			log.Info("[TPS-PROF] commitTransactions summary",
+				"committed", txCount,
+				"gasConsumed", gasAtStart-env.gasPool.Gas(),
+				"stopReason", stopReason,
+				"totalExec", common.PrettyDuration(txTotalExec),
+				"avgExec", common.PrettyDuration(avgExec),
+				"slowestExec", common.PrettyDuration(txSlowest),
+				"slowestIdx", txSlowestIdx,
+				"elapsed", common.PrettyDuration(time.Since(tCommitStart)),
+			)
+			return signalToErr(signal)
+		}
+	}
+	log.Info("[TPS-PROF] commitTransactions summary",
+		"committed", txCount,
+		"gasConsumed", gasAtStart-env.gasPool.Gas(),
+		"stopReason", stopReason,
+		"totalExec", common.PrettyDuration(txTotalExec),
+		"avgExec", common.PrettyDuration(avgExec),
+		"slowestExec", common.PrettyDuration(txSlowest),
+		"slowestIdx", txSlowestIdx,
+		"elapsed", common.PrettyDuration(time.Since(tCommitStart)),
+	)
 	return nil
 }
 
@@ -685,6 +787,8 @@ func (miner *Miner) commitTransactions(env *environment, plainTxs, blobTxs *tran
 // into the given sealing block. The transaction selection and ordering strategy can
 // be customized with the plugin in the future.
 func (miner *Miner) fillTransactions(interrupt *atomic.Int32, env *environment) error {
+	tFillStart := time.Now()
+
 	miner.confMu.RLock()
 	tip := miner.config.GasPrice
 	prio := miner.prio
@@ -705,6 +809,7 @@ func (miner *Miner) fillTransactions(interrupt *atomic.Int32, env *environment) 
 		filter.GasLimitCap = params.MaxTxGas
 	}
 	filter.BlobTxs = false
+	tPendingStart := time.Now()
 	pendingPlainTxs := miner.txpool.Pending(filter)
 
 	filter.BlobTxs = true
@@ -714,6 +819,22 @@ func (miner *Miner) fillTransactions(interrupt *atomic.Int32, env *environment) 
 		filter.BlobVersion = types.BlobSidecarVersion0
 	}
 	pendingBlobTxs := miner.txpool.Pending(filter)
+	tPendingDone := time.Now()
+
+	plainTxCount := 0
+	for _, txs := range pendingPlainTxs {
+		plainTxCount += len(txs)
+	}
+	blobTxCount := 0
+	for _, txs := range pendingBlobTxs {
+		blobTxCount += len(txs)
+	}
+	log.Info("[TPS-PROF] fillTransactions: txpool.Pending",
+		"plainAccounts", len(pendingPlainTxs),
+		"plainTxs", plainTxCount,
+		"blobTxs", blobTxCount,
+		"pendingElapsed", common.PrettyDuration(tPendingDone.Sub(tPendingStart)),
+	)
 
 	// Split the pending transactions into locals and remotes.
 	prioPlainTxs, normalPlainTxs := make(map[common.Address][]*txpool.LazyTransaction), pendingPlainTxs
@@ -746,6 +867,13 @@ func (miner *Miner) fillTransactions(interrupt *atomic.Int32, env *environment) 
 			return err
 		}
 	}
+
+	log.Info("[TPS-PROF] fillTransactions done",
+		"committedTxs", env.tcount,
+		"gasUsed", env.header.GasUsed,
+		"gasPoolLeft", env.gasPool.Gas(),
+		"totalElapsed", common.PrettyDuration(time.Since(tFillStart)),
+	)
 	return nil
 }
 

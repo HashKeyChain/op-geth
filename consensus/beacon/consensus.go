@@ -22,6 +22,8 @@ import (
 	"math"
 	"math/big"
 
+	"time"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip1559"
@@ -30,6 +32,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/trie"
 	"github.com/holiman/uint256"
@@ -379,11 +382,15 @@ func (beacon *Beacon) FinalizeAndAssemble(chain consensus.ChainHeaderReader, hea
 			return nil, errors.New("withdrawals set before Shanghai activation")
 		}
 	}
+	tFinalizeStart := time.Now()
+
 	// Finalize and assemble the block.
 	beacon.Finalize(chain, header, state, body)
+	tAfterFinalize := time.Now()
 
 	// Assign the final state root to header.
 	header.Root = state.IntermediateRoot(true)
+	tAfterStateRoot := time.Now()
 
 	if chain.Config().IsOptimismIsthmus(header.Time) {
 		if body.Withdrawals == nil || len(body.Withdrawals) > 0 { // We verify nil/empty withdrawals in the CL pre-Isthmus
@@ -410,6 +417,16 @@ func (beacon *Beacon) FinalizeAndAssemble(chain consensus.ChainHeaderReader, hea
 
 	// Assemble the final block.
 	block := types.NewBlock(header, body, receipts, trie.NewStackTrie(nil), chain.Config())
+	tAfterAssemble := time.Now()
+
+	log.Info("[TPS-PROF] FinalizeAndAssemble breakdown",
+		"block", header.Number,
+		"txs", len(body.Transactions),
+		"finalize", common.PrettyDuration(tAfterFinalize.Sub(tFinalizeStart)),
+		"stateRoot", common.PrettyDuration(tAfterStateRoot.Sub(tAfterFinalize)),
+		"assemble", common.PrettyDuration(tAfterAssemble.Sub(tAfterStateRoot)),
+		"total", common.PrettyDuration(tAfterAssemble.Sub(tFinalizeStart)),
+	)
 
 	// Create the block witness and attach to block.
 	// This step needs to happen as late as possible to catch all access events.

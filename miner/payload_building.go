@@ -410,13 +410,19 @@ func (miner *Miner) buildPayload(args *BuildPayloadArgs, witness bool) (*Payload
 					return
 				default:
 				}
-				// Assuming last payload building duration as lower bound for next one,
-				// skip new update if we're too close to the timeout anyways.
-				if lastDuration > 0 && time.Now().Add(lastDuration).After(timeout) {
-					stopReason = "near-timeout"
-					return
-				}
-				lastDuration = updatePayload()
+			// Assuming last payload building duration as lower bound for next one,
+			// skip new update if we're too close to the timeout anyways.
+			if lastDuration > 0 && time.Now().Add(lastDuration).After(timeout) {
+				log.Warn("[TPS-PROF] payload build skipped (near-timeout)",
+					"id", payload.id,
+					"lastBuildDuration", common.PrettyDuration(lastDuration),
+					"timeLeft", common.PrettyDuration(time.Until(timeout)),
+					"elapsed", common.PrettyDuration(time.Since(start)),
+				)
+				stopReason = "near-timeout"
+				return
+			}
+			lastDuration = updatePayload()
 			case <-payload.stop:
 				return
 			case <-endTimer.C:
