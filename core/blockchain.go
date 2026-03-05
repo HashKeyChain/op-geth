@@ -1622,14 +1622,16 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 	}
 	tAfterStateCommit := time.Now()
 
-	log.Info("[TPS-PROF] writeBlockWithState breakdown",
-		"block", block.NumberU64(),
-		"txs", len(block.Transactions()),
-		"blockWriteDB", common.PrettyDuration(tAfterBlockWrite.Sub(tWriteStart)),
-		"stateCommit", common.PrettyDuration(tAfterStateCommit.Sub(tAfterBlockWrite)),
-		"total", common.PrettyDuration(tAfterStateCommit.Sub(tWriteStart)),
-		"stateRoot", root,
-	)
+	if len(block.Transactions()) > 1 {
+		log.Info("[TPS-PROF] writeBlockWithState breakdown",
+			"block", block.NumberU64(),
+			"txs", len(block.Transactions()),
+			"blockWriteDB", common.PrettyDuration(tAfterBlockWrite.Sub(tWriteStart)),
+			"stateCommit", common.PrettyDuration(tAfterStateCommit.Sub(tAfterBlockWrite)),
+			"total", common.PrettyDuration(tAfterStateCommit.Sub(tWriteStart)),
+			"stateRoot", root,
+		)
+	}
 	// Emit the state update to the state sizestats if it's active
 	if bc.stateSizer != nil {
 		bc.stateSizer.Notify(stateUpdate)
@@ -1735,13 +1737,15 @@ func (bc *BlockChain) writeBlockAndSetHead(block *types.Block, receipts []*types
 		bc.chainHeadFeed.Send(ChainHeadEvent{Header: block.Header()})
 	}
 
-	log.Info("[TPS-PROF] writeBlockAndSetHead",
-		"block", block.NumberU64(),
-		"txs", len(block.Transactions()),
-		"writeState", common.PrettyDuration(tAfterWriteState.Sub(tSetHeadStart)),
-		"setHead", common.PrettyDuration(tAfterSetHead.Sub(tAfterWriteState)),
-		"total", common.PrettyDuration(time.Since(tSetHeadStart)),
-	)
+	if len(block.Transactions()) > 1 {
+		log.Info("[TPS-PROF] writeBlockAndSetHead",
+			"block", block.NumberU64(),
+			"txs", len(block.Transactions()),
+			"writeState", common.PrettyDuration(tAfterWriteState.Sub(tSetHeadStart)),
+			"setHead", common.PrettyDuration(tAfterSetHead.Sub(tAfterWriteState)),
+			"total", common.PrettyDuration(time.Since(tSetHeadStart)),
+		)
+	}
 	return CanonStatTy, nil
 }
 

@@ -254,25 +254,29 @@ func (miner *Miner) generateWork(genParam *generateParams, witness bool) *newPay
 	}
 	tAfterFinalize := time.Now()
 
-	gasUsed := work.header.GasUsed
-	gasLimit := work.header.GasLimit
-	gasUtil := float64(0)
-	if gasLimit > 0 {
-		gasUtil = float64(gasUsed) / float64(gasLimit) * 100
+	userTxCount := len(work.txs) - len(genParam.txs)
+	if userTxCount > 0 {
+		gasUsed := work.header.GasUsed
+		gasLimit := work.header.GasLimit
+		gasUtil := float64(0)
+		if gasLimit > 0 {
+			gasUtil = float64(gasUsed) / float64(gasLimit) * 100
+		}
+		log.Info("[TPS-PROF] generateWork breakdown",
+			"block", work.header.Number,
+			"txs", len(work.txs),
+			"userTxs", userTxCount,
+			"gasUsed", gasUsed,
+			"gasLimit", gasLimit,
+			"gasUtil%", fmt.Sprintf("%.1f", gasUtil),
+			"prepareWork", common.PrettyDuration(tAfterPrepare.Sub(tStart)),
+			"forceTxs", common.PrettyDuration(tBeforeFill.Sub(tAfterPrepare)),
+			"fillTxs", common.PrettyDuration(tAfterFill.Sub(tBeforeFill)),
+			"finalize", common.PrettyDuration(tAfterFinalize.Sub(tAfterFill)),
+			"total", common.PrettyDuration(tAfterFinalize.Sub(tStart)),
+			"timeout", errors.Is(fillErr, errBlockInterruptedByTimeout),
+		)
 	}
-	log.Info("[TPS-PROF] generateWork breakdown",
-		"block", work.header.Number,
-		"txs", len(work.txs),
-		"gasUsed", gasUsed,
-		"gasLimit", gasLimit,
-		"gasUtil%", fmt.Sprintf("%.1f", gasUtil),
-		"prepareWork", common.PrettyDuration(tAfterPrepare.Sub(tStart)),
-		"forceTxs", common.PrettyDuration(tBeforeFill.Sub(tAfterPrepare)),
-		"fillTxs", common.PrettyDuration(tAfterFill.Sub(tBeforeFill)),
-		"finalize", common.PrettyDuration(tAfterFinalize.Sub(tAfterFill)),
-		"total", common.PrettyDuration(tAfterFinalize.Sub(tStart)),
-		"timeout", errors.Is(fillErr, errBlockInterruptedByTimeout),
-	)
 
 	return &newPayloadResult{
 		block:    block,
@@ -754,9 +758,8 @@ func (miner *Miner) commitTransactions(env *environment, plainTxs, blobTxs *tran
 	if txCount > 0 {
 		avgExec = txTotalExec / time.Duration(txCount)
 	}
-	// Handle interrupt return after logging
-	if interrupt != nil {
-		if signal := interrupt.Load(); signal != commitInterruptNone {
+	logSummary := func() {
+		if txCount > 0 || stopReason != "no-more-txs" {
 			log.Info("[TPS-PROF] commitTransactions summary",
 				"committed", txCount,
 				"gasConsumed", gasAtStart-env.gasPool.Gas(),
@@ -767,19 +770,16 @@ func (miner *Miner) commitTransactions(env *environment, plainTxs, blobTxs *tran
 				"slowestIdx", txSlowestIdx,
 				"elapsed", common.PrettyDuration(time.Since(tCommitStart)),
 			)
+		}
+	}
+	// Handle interrupt return after logging
+	if interrupt != nil {
+		if signal := interrupt.Load(); signal != commitInterruptNone {
+			logSummary()
 			return signalToErr(signal)
 		}
 	}
-	log.Info("[TPS-PROF] commitTransactions summary",
-		"committed", txCount,
-		"gasConsumed", gasAtStart-env.gasPool.Gas(),
-		"stopReason", stopReason,
-		"totalExec", common.PrettyDuration(txTotalExec),
-		"avgExec", common.PrettyDuration(avgExec),
-		"slowestExec", common.PrettyDuration(txSlowest),
-		"slowestIdx", txSlowestIdx,
-		"elapsed", common.PrettyDuration(time.Since(tCommitStart)),
-	)
+	logSummary()
 	return nil
 }
 
@@ -829,12 +829,14 @@ func (miner *Miner) fillTransactions(interrupt *atomic.Int32, env *environment) 
 	for _, txs := range pendingBlobTxs {
 		blobTxCount += len(txs)
 	}
-	log.Info("[TPS-PROF] fillTransactions: txpool.Pending",
-		"plainAccounts", len(pendingPlainTxs),
-		"plainTxs", plainTxCount,
-		"blobTxs", blobTxCount,
-		"pendingElapsed", common.PrettyDuration(tPendingDone.Sub(tPendingStart)),
-	)
+	if plainTxCount > 0 || blobTxCount > 0 {
+		log.Info("[TPS-PROF] fillTransactions: txpool.Pending",
+			"plainAccounts", len(pendingPlainTxs),
+			"plainTxs", plainTxCount,
+			"blobTxs", blobTxCount,
+			"pendingElapsed", common.PrettyDuration(tPendingDone.Sub(tPendingStart)),
+		)
+	}
 
 	// Split the pending transactions into locals and remotes.
 	prioPlainTxs, normalPlainTxs := make(map[common.Address][]*txpool.LazyTransaction), pendingPlainTxs
@@ -868,12 +870,14 @@ func (miner *Miner) fillTransactions(interrupt *atomic.Int32, env *environment) 
 		}
 	}
 
-	log.Info("[TPS-PROF] fillTransactions done",
-		"committedTxs", env.tcount,
-		"gasUsed", env.header.GasUsed,
-		"gasPoolLeft", env.gasPool.Gas(),
-		"totalElapsed", common.PrettyDuration(time.Since(tFillStart)),
-	)
+	if env.tcount > 0 {
+		log.Info("[TPS-PROF] fillTransactions done",
+			"committedTxs", env.tcount,
+			"gasUsed", env.header.GasUsed,
+			"gasPoolLeft", env.gasPool.Gas(),
+			"totalElapsed", common.PrettyDuration(time.Since(tFillStart)),
+		)
+	}
 	return nil
 }
 

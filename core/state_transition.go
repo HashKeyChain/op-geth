@@ -621,19 +621,21 @@ func (st *stateTransition) innerExecute() (*ExecutionResult, error) {
 		tAfterCall := time.Now()
 
 		gasUsedByCall := st.initialGas - st.gasRemaining - gas
-		log.Info("[TPS-PROF] innerExecute breakdown",
-			"from", msg.From,
-			"to", st.to(),
-			"dataLen", len(msg.Data),
-			"gasLimit", msg.GasLimit,
-			"gasUsedEVM", gasUsedByCall,
-			"7702auths", numAuths,
-			"preCheck", common.PrettyDuration(tAfterPreCheck.Sub(tInnerStart)),
-			"prepare", common.PrettyDuration(tAfterPrepare.Sub(tAfterPreCheck)),
-			"7702auth", common.PrettyDuration(tAfterAuth.Sub(tAfterPrepare)),
-			"evmCall", common.PrettyDuration(tAfterCall.Sub(tAfterAuth)),
-			"vmErr", vmerr,
-		)
+		if !st.msg.IsDepositTx {
+			log.Info("[TPS-PROF] innerExecute breakdown",
+				"from", msg.From,
+				"to", st.to(),
+				"dataLen", len(msg.Data),
+				"gasLimit", msg.GasLimit,
+				"gasUsedEVM", gasUsedByCall,
+				"7702auths", numAuths,
+				"preCheck", common.PrettyDuration(tAfterPreCheck.Sub(tInnerStart)),
+				"prepare", common.PrettyDuration(tAfterPrepare.Sub(tAfterPreCheck)),
+				"7702auth", common.PrettyDuration(tAfterAuth.Sub(tAfterPrepare)),
+				"evmCall", common.PrettyDuration(tAfterCall.Sub(tAfterAuth)),
+				"vmErr", vmerr,
+			)
+		}
 	}
 
 	// OP-Stack: pre-Regolith: if deposit, skip refunds, skip tipping coinbase

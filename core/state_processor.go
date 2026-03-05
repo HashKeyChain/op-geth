@@ -190,14 +190,16 @@ func ApplyTransactionWithEVM(msg *Message, gp *GasPool, statedb *state.StateDB, 
 	r := MakeReceipt(evm, result, statedb, blockNumber, blockHash, blockTime, tx, *usedGas, root, evm.ChainConfig(), nonce)
 	tAfterReceipt := time.Now()
 
-	log.Info("[TPS-PROF] ApplyTxWithEVM breakdown",
-		"txHash", tx.Hash().Hex()[:10],
-		"gasUsed", result.UsedGas,
-		"applyMsg", common.PrettyDuration(tAfterApply.Sub(tApplyStart)),
-		"finalise", common.PrettyDuration(tAfterFinalise.Sub(tAfterApply)),
-		"receipt", common.PrettyDuration(tAfterReceipt.Sub(tAfterFinalise)),
-		"total", common.PrettyDuration(tAfterReceipt.Sub(tApplyStart)),
-	)
+	if !tx.IsDepositTx() {
+		log.Info("[TPS-PROF] ApplyTxWithEVM breakdown",
+			"txHash", tx.Hash().Hex()[:10],
+			"gasUsed", result.UsedGas,
+			"applyMsg", common.PrettyDuration(tAfterApply.Sub(tApplyStart)),
+			"finalise", common.PrettyDuration(tAfterFinalise.Sub(tAfterApply)),
+			"receipt", common.PrettyDuration(tAfterReceipt.Sub(tAfterFinalise)),
+			"total", common.PrettyDuration(tAfterReceipt.Sub(tApplyStart)),
+		)
+	}
 	return r, nil
 }
 

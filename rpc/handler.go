@@ -499,7 +499,7 @@ func (h *handler) handleCallMsgInner(ctx *callProc, msg *jsonrpcMessage) *jsonrp
 			if resp.Error.Data != nil {
 				logctx = append(logctx, "errdata", formatErrorData(resp.Error.Data))
 			}
-			h.log.Warn("Served "+msg.Method, logctx...)
+			h.log.Debug("Served "+msg.Method, logctx...)
 		} else {
 			h.log.Debug("Served "+msg.Method, logctx...)
 		}

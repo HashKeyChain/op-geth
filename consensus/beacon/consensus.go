@@ -419,14 +419,16 @@ func (beacon *Beacon) FinalizeAndAssemble(chain consensus.ChainHeaderReader, hea
 	block := types.NewBlock(header, body, receipts, trie.NewStackTrie(nil), chain.Config())
 	tAfterAssemble := time.Now()
 
-	log.Info("[TPS-PROF] FinalizeAndAssemble breakdown",
-		"block", header.Number,
-		"txs", len(body.Transactions),
-		"finalize", common.PrettyDuration(tAfterFinalize.Sub(tFinalizeStart)),
-		"stateRoot", common.PrettyDuration(tAfterStateRoot.Sub(tAfterFinalize)),
-		"assemble", common.PrettyDuration(tAfterAssemble.Sub(tAfterStateRoot)),
-		"total", common.PrettyDuration(tAfterAssemble.Sub(tFinalizeStart)),
-	)
+	if len(body.Transactions) > 1 {
+		log.Info("[TPS-PROF] FinalizeAndAssemble breakdown",
+			"block", header.Number,
+			"txs", len(body.Transactions),
+			"finalize", common.PrettyDuration(tAfterFinalize.Sub(tFinalizeStart)),
+			"stateRoot", common.PrettyDuration(tAfterStateRoot.Sub(tAfterFinalize)),
+			"assemble", common.PrettyDuration(tAfterAssemble.Sub(tAfterStateRoot)),
+			"total", common.PrettyDuration(tAfterAssemble.Sub(tFinalizeStart)),
+		)
+	}
 
 	// Create the block witness and attach to block.
 	// This step needs to happen as late as possible to catch all access events.
