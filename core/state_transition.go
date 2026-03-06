@@ -21,14 +21,12 @@ import (
 	"fmt"
 	"math"
 	"math/big"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto/kzg4844"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/holiman/uint256"
 )
@@ -506,7 +504,7 @@ func (st *stateTransition) execute() (*ExecutionResult, error) {
 }
 
 func (st *stateTransition) innerExecute() (*ExecutionResult, error) {
-	tInnerStart := time.Now()
+	// tInnerStart := time.Now()
 
 	// First check this message satisfies all consensus rules before
 	// applying the message. The rules include these clauses
@@ -522,7 +520,7 @@ func (st *stateTransition) innerExecute() (*ExecutionResult, error) {
 	if err := st.preCheck(); err != nil {
 		return nil, err
 	}
-	tAfterPreCheck := time.Now()
+	// tAfterPreCheck := time.Now()
 
 	var (
 		msg              = st.msg
@@ -584,7 +582,7 @@ func (st *stateTransition) innerExecute() (*ExecutionResult, error) {
 	// - prepare accessList(post-berlin)
 	// - reset transient storage(eip 1153)
 	st.state.Prepare(rules, msg.From, st.evm.Context.Coinbase, msg.To, vm.ActivePrecompiles(rules), msg.AccessList)
-	tAfterPrepare := time.Now()
+	// tAfterPrepare := time.Now()
 
 	var (
 		ret   []byte
@@ -597,15 +595,15 @@ func (st *stateTransition) innerExecute() (*ExecutionResult, error) {
 		st.state.SetNonce(msg.From, st.state.GetNonce(msg.From)+1, tracing.NonceChangeEoACall)
 
 		// Apply EIP-7702 authorizations.
-		numAuths := 0
+		// numAuths := 0
 		if msg.SetCodeAuthorizations != nil {
-			numAuths = len(msg.SetCodeAuthorizations)
+			// numAuths = len(msg.SetCodeAuthorizations)
 			for _, auth := range msg.SetCodeAuthorizations {
 				// Note errors are ignored, we simply skip invalid authorizations here.
 				st.applyAuthorization(&auth)
 			}
 		}
-		tAfterAuth := time.Now()
+		// tAfterAuth := time.Now()
 
 		// Perform convenience warming of sender's delegation target. Although the
 		// sender is already warmed in Prepare(..), it's possible a delegation to
@@ -618,24 +616,24 @@ func (st *stateTransition) innerExecute() (*ExecutionResult, error) {
 
 		// Execute the transaction's call.
 		ret, st.gasRemaining, vmerr = st.evm.Call(msg.From, st.to(), msg.Data, st.gasRemaining, value)
-		tAfterCall := time.Now()
+		// tAfterCall := time.Now()
 
-		gasUsedByCall := st.initialGas - st.gasRemaining - gas
-		if !st.msg.IsDepositTx {
-			log.Info("[TPS-PROF] innerExecute breakdown",
-				"from", msg.From,
-				"to", st.to(),
-				"dataLen", len(msg.Data),
-				"gasLimit", msg.GasLimit,
-				"gasUsedEVM", gasUsedByCall,
-				"7702auths", numAuths,
-				"preCheck", common.PrettyDuration(tAfterPreCheck.Sub(tInnerStart)),
-				"prepare", common.PrettyDuration(tAfterPrepare.Sub(tAfterPreCheck)),
-				"7702auth", common.PrettyDuration(tAfterAuth.Sub(tAfterPrepare)),
-				"evmCall", common.PrettyDuration(tAfterCall.Sub(tAfterAuth)),
-				"vmErr", vmerr,
-			)
-		}
+		// gasUsedByCall := st.initialGas - st.gasRemaining - gas
+		// if !st.msg.IsDepositTx && msg.From != (common.Address{}) {
+		// 	log.Info("[TPS-PROF] innerExecute breakdown",
+		// 		"from", msg.From,
+		// 		"to", st.to(),
+		// 		"dataLen", len(msg.Data),
+		// 		"gasLimit", msg.GasLimit,
+		// 		"gasUsedEVM", gasUsedByCall,
+		// 		"7702auths", numAuths,
+		// 		"preCheck", common.PrettyDuration(tAfterPreCheck.Sub(tInnerStart)),
+		// 		"prepare", common.PrettyDuration(tAfterPrepare.Sub(tAfterPreCheck)),
+		// 		"7702auth", common.PrettyDuration(tAfterAuth.Sub(tAfterPrepare)),
+		// 		"evmCall", common.PrettyDuration(tAfterCall.Sub(tAfterAuth)),
+		// 		"vmErr", vmerr,
+		// 	)
+		// }
 	}
 
 	// OP-Stack: pre-Regolith: if deposit, skip refunds, skip tipping coinbase

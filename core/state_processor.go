@@ -190,7 +190,7 @@ func ApplyTransactionWithEVM(msg *Message, gp *GasPool, statedb *state.StateDB, 
 	r := MakeReceipt(evm, result, statedb, blockNumber, blockHash, blockTime, tx, *usedGas, root, evm.ChainConfig(), nonce)
 	tAfterReceipt := time.Now()
 
-	if !tx.IsDepositTx() {
+	if !tx.IsDepositTx() && msg.From != (common.Address{}) {
 		log.Info("[TPS-PROF] ApplyTxWithEVM breakdown",
 			"txHash", tx.Hash().Hex()[:10],
 			"gasUsed", result.UsedGas,
