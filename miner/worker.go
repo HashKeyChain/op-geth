@@ -550,6 +550,7 @@ func (miner *Miner) commitTransactions(env *environment, plainTxs, blobTxs *tran
 		txSlowestIdx int
 		gasAtStart   = env.gasPool.Gas()
 		stopReason   = "no-more-txs"
+		gasSkipped   int // txs skipped because remaining gas < tx.Gas
 	)
 
 	if interrupt != nil {
@@ -613,12 +614,19 @@ func (miner *Miner) commitTransactions(env *environment, plainTxs, blobTxs *tran
 			}
 		}
 		if ltx == nil {
+			// If gas was the real binding constraint (some txs were popped due to
+			// insufficient gas, and the pool still had gas above the minimum threshold),
+			// report "gas-limit" rather than the misleading "no-more-txs".
+			if gasSkipped > 0 && env.gasPool.Gas() >= params.TxGas {
+				stopReason = fmt.Sprintf("gas-limit(%d-txs-skipped)", gasSkipped)
+			}
 			break
 		}
 		// If we don't have enough space for the next transaction, skip the account.
 		if env.gasPool.Gas() < ltx.Gas {
 			log.Info("[TPS-PROF] gas not enough for next tx, skipping",
 				"txHash", ltx.Hash, "gasLeft", env.gasPool.Gas(), "txGas", ltx.Gas)
+			gasSkipped++
 			txs.Pop()
 			continue
 		}
@@ -762,6 +770,7 @@ func (miner *Miner) commitTransactions(env *environment, plainTxs, blobTxs *tran
 		log.Info("[TPS-PROF] commitTransactions summary",
 			"committed", txCount,
 			"gasConsumed", gasAtStart-env.gasPool.Gas(),
+			"gasPoolLeft", env.gasPool.Gas(),
 			"stopReason", stopReason,
 			"totalExec", common.PrettyDuration(txTotalExec),
 			"avgExec", common.PrettyDuration(avgExec),
