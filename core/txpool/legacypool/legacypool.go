@@ -1010,6 +1010,7 @@ func (pool *LegacyPool) addRemoteSync(tx *types.Transaction) error {
 // Note, if sync is set the method will block until all internal maintenance
 // related to the add is finished. Only use this during tests for determinism.
 func (pool *LegacyPool) Add(txs []*types.Transaction, sync bool) []error {
+	tAddStart := time.Now()
 	// Filter out known ones without obtaining the pool lock or recovering signatures
 	var (
 		errs = make([]error, len(txs))
@@ -1038,10 +1039,13 @@ func (pool *LegacyPool) Add(txs []*types.Transaction, sync bool) []error {
 		return errs
 	}
 
+	tBeforeLock := time.Now()
 	// Process all the new transaction and merge any errors into the original slice
 	pool.mu.Lock()
+	tAfterLock := time.Now()
 	newErrs, dirtyAddrs := pool.addTxsLocked(news)
 	pool.mu.Unlock()
+	tAfterAddLocked := time.Now()
 
 	nilSlot := 0
 	for _, err := range newErrs {
@@ -1055,6 +1059,15 @@ func (pool *LegacyPool) Add(txs []*types.Transaction, sync bool) []error {
 	done := pool.requestPromoteExecutables(dirtyAddrs)
 	if sync {
 		<-done
+	}
+	if len(txs) == 1 {
+		log.Info("[RPC-PROF] txpool.Add breakdown",
+			"hash", txs[0].Hash().Hex()[:10],
+			"validate", common.PrettyDuration(tBeforeLock.Sub(tAddStart)),
+			"waitLock", common.PrettyDuration(tAfterLock.Sub(tBeforeLock)),
+			"addLocked", common.PrettyDuration(tAfterAddLocked.Sub(tAfterLock)),
+			"total", common.PrettyDuration(tAfterAddLocked.Sub(tAddStart)),
+		)
 	}
 	return errs
 }

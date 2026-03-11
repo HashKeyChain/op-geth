@@ -1833,7 +1833,6 @@ func SubmitTransaction(ctx context.Context, b Backend, tx *types.Transaction) (c
 	if err != nil {
 		return common.Hash{}, err
 	}
-
 	if tx.To() == nil {
 		addr := crypto.CreateAddress(from, tx.Nonce())
 		log.Info("Submitted contract creation", "hash", tx.Hash().Hex(), "from", from, "nonce", tx.Nonce(), "contract", addr.Hex(), "value", tx.Value())
@@ -1912,6 +1911,7 @@ func (api *TransactionAPI) currentBlobSidecarVersion() byte {
 // SendRawTransaction will add the signed transaction to the transaction pool.
 // The sender is responsible for signing the transaction and using the correct nonce.
 func (api *TransactionAPI) SendRawTransaction(ctx context.Context, input hexutil.Bytes) (common.Hash, error) {
+	tStart := time.Now()
 	tx := new(types.Transaction)
 	if err := tx.UnmarshalBinary(input); err != nil {
 		return common.Hash{}, err
@@ -1929,7 +1929,9 @@ func (api *TransactionAPI) SendRawTransaction(ctx context.Context, input hexutil
 		}
 	}
 
-	return SubmitTransaction(ctx, api.b, tx)
+	hash, err := SubmitTransaction(ctx, api.b, tx)
+	log.Info("[RPC-PROF] SendRawTransaction", "hash", tx.Hash().Hex()[:10], "nonce", tx.Nonce(), "total", common.PrettyDuration(time.Since(tStart)))
+	return hash, err
 }
 
 // Sign calculates an ECDSA signature for:
