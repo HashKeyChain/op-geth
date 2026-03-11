@@ -1643,7 +1643,12 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 	}
 	// If we're running an archive node, always flush
 	if bc.cfg.ArchiveMode {
-		return bc.triedb.Commit(root, false)
+		tTrieCommitStart := time.Now()
+		err := bc.triedb.Commit(root, false)
+		if len(block.Transactions()) > 1 {
+			log.Info("[TPS-PROF] triedb.Commit", "block", block.NumberU64(), "txs", len(block.Transactions()), "elapsed", common.PrettyDuration(time.Since(tTrieCommitStart)))
+		}
+		return err
 	}
 	// Full but not archive node, do proper garbage collection
 	bc.triedb.Reference(root, common.Hash{}) // metadata reference to keep trie alive
