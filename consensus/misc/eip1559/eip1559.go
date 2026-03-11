@@ -90,6 +90,8 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, time uint64) 
 }
 
 func calcBaseFeeInner(config *params.ChainConfig, parent *types.Header, elasticity uint64, denominator uint64) *big.Int {
+	// TPS-TEST: fix baseFee to 1 Gwei regardless of gas usage
+	return big.NewInt(1_000_000_000)
 	parentGasTarget := parent.GasLimit / elasticity
 	parentGasMetered := parent.GasUsed
 	if config.IsJovian(parent.Time) {
