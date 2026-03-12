@@ -191,7 +191,7 @@ func ApplyTransactionWithEVM(msg *Message, gp *GasPool, statedb *state.StateDB, 
 	tAfterReceipt := time.Now()
 
 	if !tx.IsDepositTx() && msg.From != (common.Address{}) {
-		log.Info("[TPS-PROF] ApplyTxWithEVM breakdown",
+		log.Debug("[TPS-PROF] ApplyTxWithEVM breakdown",
 			"txHash", tx.Hash().Hex()[:10],
 			"gasUsed", result.UsedGas,
 			"applyMsg", common.PrettyDuration(tAfterApply.Sub(tApplyStart)),

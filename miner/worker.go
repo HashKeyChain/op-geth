@@ -624,7 +624,7 @@ func (miner *Miner) commitTransactions(env *environment, plainTxs, blobTxs *tran
 		}
 		// If we don't have enough space for the next transaction, skip the account.
 		if env.gasPool.Gas() < ltx.Gas {
-			log.Info("[TPS-PROF] gas not enough for next tx, skipping",
+			log.Debug("[TPS-PROF] gas not enough for next tx, skipping",
 				"txHash", ltx.Hash, "gasLeft", env.gasPool.Gas(), "txGas", ltx.Gas)
 			gasSkipped++
 			txs.Pop()
@@ -738,7 +738,7 @@ func (miner *Miner) commitTransactions(env *environment, plainTxs, blobTxs *tran
 				txSlowest = txExecDur
 				txSlowestIdx = txCount
 			}
-			log.Info("[TPS-PROF] tx committed",
+			log.Debug("[TPS-PROF] tx committed",
 				"idx", txCount,
 				"hash", tx.Hash().Hex()[:10],
 				"from", from,

@@ -1930,7 +1930,7 @@ func (api *TransactionAPI) SendRawTransaction(ctx context.Context, input hexutil
 	}
 
 	hash, err := SubmitTransaction(ctx, api.b, tx)
-	log.Info("[RPC-PROF] SendRawTransaction", "hash", tx.Hash().Hex()[:10], "nonce", tx.Nonce(), "total", common.PrettyDuration(time.Since(tStart)))
+	log.Debug("[RPC-PROF] SendRawTransaction", "hash", tx.Hash().Hex()[:10], "nonce", tx.Nonce(), "total", common.PrettyDuration(time.Since(tStart)))
 	return hash, err
 }
 
