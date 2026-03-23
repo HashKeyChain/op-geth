@@ -651,6 +651,7 @@ func (miner *Miner) commitTransactions(env *environment, plainTxs, blobTxs *tran
 			txDAFootprint = ltx.DABytes.Uint64() * uint64(env.daFootprintGasScalar)
 			if daFootprintLeft < txDAFootprint {
 				log.Debug("Not enough DA space left for transaction", "hash", ltx.Hash, "left", daFootprintLeft, "needed", txDAFootprint)
+				stopReason = fmt.Sprintf("da-footprint-limit(after-%d-txs)", txCount)
 				txs.Pop()
 				continue
 			}
@@ -663,6 +664,7 @@ func (miner *Miner) commitTransactions(env *environment, plainTxs, blobTxs *tran
 			if daBytesAfter.Cmp(miner.config.MaxDABlockSize) > 0 {
 				log.Debug("adding tx would exceed block DA size limit",
 					"hash", ltx.Hash, "txda", ltx.DABytes, "blockda", blockDABytes, "dalimit", miner.config.MaxDABlockSize)
+				stopReason = fmt.Sprintf("da-block-size-limit(after-%d-txs)", txCount)
 				txs.Pop()
 				// If the number of remaining bytes is too few to hold even the minimum possible transaction size,
 				// then we can stop early.
